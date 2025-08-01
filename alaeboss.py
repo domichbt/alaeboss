@@ -308,11 +308,8 @@ if __name__ == "__main__":
     from time import time
     import jax.random as jrd
     use_float64 = jax.config.jax_enable_x64
-    seed = 1234
-    key1 = jrd.key(seed)
+    key1 = jrd.key(1234)
     key2 = jrd.key(5678)
-    print(key1)
-    print(key2)
     datalen = int(1e6)
     randomlen = int(1e8)
     nbins = 10
