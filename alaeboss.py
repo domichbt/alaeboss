@@ -6,6 +6,10 @@ import logging
 from functools import partial
 import matplotlib.pyplot as plt
 
+@jax.jit
+def my_bincount(idx, accumutalor, weights):
+    return accumutalor.at[idx].add(weights)
+
 class LinearRegressor:
     constant = 'constant'  # Name of the constant contribution in the weights
     bin_margin = 1e-7  # Extra space at the beginning and end of edges to avoid null-sized bins
@@ -137,13 +141,13 @@ class LinearRegressor:
         self.logger.debug("Digitized randoms")
 
         # no axis-dependent implementation of bincount or histogram so have to initialize and fill array
-        self.randoms_binned = jax.vmap(partial(jnp.bincount, weights=self.randoms, length=self.nbins))(self.randoms_digitized)
+        self.randoms_binned = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins, dtype=float), weights=self.randoms))(self.randoms_digitized)
         self.logger.debug("Binned randoms")
 
         # also digitize the data for later use (can simply bincount with updated model weights)
         self.data_digitized = jnp.floor(self.template_values_data_normalized * nbins).astype(int)  # Equivalent to digitize but faster
         self.logger.debug("Digitized data")
-        self.data_binned_noweights = jax.vmap(partial(jnp.bincount, weights=self.data, length=self.nbins))(self.data_digitized)
+        self.data_binned_noweights = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins, dtype=float), weights=self.data))(self.data_digitized)
         self.logger.debug("Binned data")
 
         # and fix the errors on each bin
@@ -174,8 +178,7 @@ class LinearRegressor:
         :type coefficients: ArrayLike
         
         """
-
-        data_binned = jax.vmap(partial(jnp.bincount, weights=self.data * self.weight_model(coefficients), length=self.nbins))(self.data_digitized)
+        data_binned = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins, dtype=float), weights=self.data * self.weight_model(coefficients)))(self.data_digitized)
         # error_everywhere = self.normalization * \
         #     jnp.sqrt(data_binned / self.randoms_binned**2 + data_binned**2 / self.randoms_binned**3) # model dependent error
         # Compute the chisquare over actual imaging templates (not the constant, which is mostly useful for the weight model)
@@ -289,7 +292,7 @@ class LinearRegressor:
             coefficients = self.coefficients
 
         centers = (self.edges[:, :-1] + self.edges[:, 1:])/2
-        data_binned = jax.vmap(partial(jnp.bincount, weights=self.data * self.weight_model(coefficients), length=self.nbins))(self.data_digitized)
+        data_binned = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins, dtype=float), weights=self.data * self.weight_model(coefficients)))(self.data_digitized)
         chi2_arr = ((self.normalization * data_binned/self.randoms_binned - 1)**2/self.error**2)
         chi2_arr_noweights = ((self.normalization * self.data_binned_noweights/self.randoms_binned - 1)**2/self.error**2)
 
