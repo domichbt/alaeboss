@@ -30,16 +30,19 @@ class LinearRegressor:
         :param loglevel: Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG.
         :type loglevel: str
         """
+        # Build the systematics matrices
+        template_values_data = jnp.vstack([jnp.array(template[0]) for template in templates.values()])
+        template_values_randoms = jnp.vstack([jnp.array(template[1]) for template in templates.values()])
+
+        self._initial_setup(data_weights=data_weights, random_weights=random_weights, template_values_data=template_values_data, template_values_randoms=template_values_randoms, template_names=list(templates.keys()), loglevel=loglevel)
+
+    def _initial_setup(self, data_weights: ArrayLike, random_weights: ArrayLike, template_values_data: ArrayLike, template_values_randoms: ArrayLike, template_names: list[str], loglevel: str = "INFO"):
         self.logger.setLevel(loglevel)
 
-        self.template_names = list(templates.keys())
+        self.template_names = template_names
         self.logger.info("Setting up %i templates", len(self.template_names))
 
         self.coefficients = jnp.full((len(self.template_names) + 1), fill_value=jnp.nan, dtype=float) # Best fit coefficients, empty for now
-
-        # Build the systematics matrices
-        template_values_data = jnp.vstack([jnp.array(templates[name][0]) for name in self.template_names])
-        template_values_randoms = jnp.vstack([jnp.array(templates[name][1]) for name in self.template_names])
 
         # Templates values will be stored as numpy arrays to avoid for loops, keep a private translation between index and template name
         self._template_name_to_idx = {name: idx for idx, name in enumerate(self.template_names)}
@@ -62,6 +65,30 @@ class LinearRegressor:
         self.logger.info("Data:    %i -> %i", self.good_values_data.size, self.data.size)
         self.logger.info("Randoms: %i -> %i", self.good_values_randoms.size, self.randoms.size)
         self.logger.debug("Current normalization factor is %f", self.normalization)
+
+    @classmethod
+    def from_stacked_templates(cls, data_weights: ArrayLike, random_weights: ArrayLike, template_values_data: ArrayLike, template_values_randoms: ArrayLike, template_names: list[str], loglevel: str = "INFO"):
+        """
+        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the `cut_outliers`, `prepare` and `regress` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the `weight_model` method on the `coefficients` attribute.
+
+        :param data_weights: External, non-imaging weights for each object of the data catalog (FKP, completeness...)
+        :type data_weights: ArrayLike
+        :param random_weights: External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
+        :type random_weights: ArrayLike
+        :param template_values_data: Array containing the template values for the data, for each template (shape = (# of templates, length of data))
+        :type template_values_data: ArrayLike
+        :param template_values_randoms: Array containing the template values for the randoms, for each template (shape = (# of templates, length of randoms))
+        :type template_values_randoms: ArrayLike
+        :param template_names: List of the names of the templates, in the same order as in `template_values_data` and  `template_values_randoms`
+        :type template_names: list[str]
+        :param loglevel: Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG
+        :type loglevel: str
+        :return: LinearRegressor instance, as would have been initialized with templates written in dictionaries (default `__init__`).
+        :rtype: LinearRegressor
+        """
+        reg = cls.__new__(cls, data_weights=data_weights, random_weights=random_weights, template_values_data=template_values_data, template_values_randoms=template_values_randoms, template_names=template_names, loglevel=loglevel)
+        reg._initial_setup(data_weights=data_weights, random_weights=random_weights, template_values_data=template_values_data, template_values_randoms=template_values_randoms, template_names=template_names, loglevel=loglevel)
+        return reg
 
     def cut_outliers(self, tail: float = 0.5):
         """
