@@ -268,8 +268,20 @@ class LinearRegressor:
         new_regressor.prepare(nbins=self.nbins)
         return new_regressor
     
-    def plot_overdensity(self, coefficients : ArrayLike | None = None, ylim=[0.75, 1.25], nbinsh=50, title=None):
-        fig, axes = plt.subplots(1, len(self.template_names), sharey=True, layout='constrained', figsize=(15,3))
+    def plot_overdensity(self, coefficients: ArrayLike | None = None, ylim: list[float, float] = [0.75, 1.25], nbinsh: int = 50, title: str = None):
+        """
+        Create a subplot for each template, and plot the normalized histogram values before and after the regression. The initial distribution of the template on the data is overlaid on the bottom of the plot. 
+   
+        :param coefficients: parameters for the weight model; if None, will default to the regression result.
+        :type coefficients: ArrayLike | None
+        :param ylim: Limits for the y-axis
+        :type ylim: list[float, float]
+        :param nbinsh: Number of bins for the overlaid histograms
+        :type nbinsh: int
+        :param title: Optional title
+        :type title: str
+        """
+        fig, axes = plt.subplots(1, len(self.template_names), sharey=True, layout='constrained', figsize=(15, 3))
         axes[0].set_ylim(ylim)
 
         if coefficients is None:
@@ -281,14 +293,16 @@ class LinearRegressor:
         chi2_arr = ((self.normalization * data_binned/self.randoms_binned - 1)**2/self.error**2)
         chi2_arr_noweights = ((self.normalization * self.data_binned_noweights/self.randoms_binned - 1)**2/self.error**2)
 
-        for index, (coefficient_name, coefficient_value, ax) in enumerate(zip(self.template_names, coefficients, axes)):
-            partial_chi2 = (chi2_arr[index]).sum()
+        for index, (coefficient_name, ax) in enumerate(zip(self.template_names, axes)):
             partial_chi2_noweights = (chi2_arr_noweights[index]).sum()
-            ax.errorbar(centers[index], self.normalization * data_binned[index] / self.randoms_binned[index], self.error[index], fmt='.', label=f"χ² = {partial_chi2:.2f}/{self.nbins} = {partial_chi2/self.nbins:.2f}")
-            ax.errorbar(centers[index], self.normalization * self.data_binned_noweights[index] / self.randoms_binned[index], self.error[index], fmt='.', label=f"χ² = {partial_chi2_noweights:.2f}/{self.nbins} = {partial_chi2_noweights/self.nbins:.2f}")
+            ax.errorbar(centers[index], self.normalization * self.data_binned_noweights[index] / self.randoms_binned[index],
+                        self.error[index], fmt='.', label=f"χ² = {partial_chi2_noweights:.2f}/{self.nbins} = {partial_chi2_noweights/self.nbins:.2f}")
+
+            partial_chi2 = (chi2_arr[index]).sum()
+            ax.errorbar(centers[index], self.normalization * data_binned[index] / self.randoms_binned[index], self.error[index],
+                        fmt='.', label=f"χ² = {partial_chi2:.2f}/{self.nbins} = {partial_chi2/self.nbins:.2f}")
 
             hist_data_syst, bins = jnp.histogram(self.template_values_data[index], bins=nbinsh)
-            # x = bins
             y = hist_data_syst / hist_data_syst.max() * 0.3*(ylim[1]-ylim[0])+ylim[0]
             ax.stairs(y, bins)
 
@@ -297,7 +311,7 @@ class LinearRegressor:
         fig.supylabel("Density fluctuations")
         fig.suptitle(title)
 
-
+        return fig, axes
 
 
 
