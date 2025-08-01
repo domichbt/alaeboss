@@ -235,7 +235,7 @@ class LinearRegressor:
         else:
             self.logger.info("Minimization succeeded, chisquare = %f\n%s", m.fval, m.fmin)
             self.coefficients = jnp.array(m.values)
-            return dict(zip([self.constant]+self.template_names, self.coefficients))
+            return dict(zip([self.constant]+self.template_names, list(m.values)))
 
     def export_weights(self):
         """
