@@ -4,7 +4,7 @@ from jax.typing import ArrayLike
 import jax
 import logging
 from functools import partial
-
+import matplotlib.pyplot as plt
 
 class LinearRegressor:
     constant = 'constant'  # Name of the constant contribution in the weights
@@ -244,6 +244,59 @@ class LinearRegressor:
         assert (~jnp.isnan(self.coefficients)).any()
         _template_values_data_for_export_normalized = ((self._template_values_data_for_export.T - self.edges[:, 0]) / (self.edges[:, -1] - self.edges[:, 0])).T
         return 1 / (1 + self.coefficients[0] + jnp.dot(self.coefficients[1:], _template_values_data_for_export_normalized))
+    
+    def mask(self):
+        if hasattr(self, "extremal_data_mask"):
+            return self.good_values_data.at[self.good_values_data].set(self.extremal_data_mask)
+        else:
+            return self.good_values_data
+    
+    # Additional methods to match original `Syst` class
+    def get_subsample(self, subdata_mask: ArrayLike):
+        """
+        Docstring for get_subsample
+        
+        :param self: Instance to copy
+        :param subdata_mask: Mask to apply on the data and templates. Note that these should have had bad values and outliers cut out, so the shape may be different from initial data fed to the initializer. Correspondance between original and current shape can be obtained from `LinearRegressor.mask()`. 
+        :type subdata_mask: ArrayLike
+        """
+        data_weights = self.data[subdata_mask]
+        random_weights = self.randoms
+        templates = {name:(self.template_values_data[self._template_name_to_idx[name]][subdata_mask], self.template_values_randoms[self._template_name_to_idx[name]]) for name in self.template_names}
+        new_regressor = self.__class__(data_weights=data_weights, random_weights=random_weights, templates=templates, loglevel=self.logger.level)
+        # do not cut outliers again
+        new_regressor.prepare(nbins=self.nbins)
+        return new_regressor
+    
+    def plot_overdensity(self, coefficients : ArrayLike | None = None, ylim=[0.75, 1.25], nbinsh=50, title=None):
+        fig, axes = plt.subplots(1, len(self.template_names), sharey=True, layout='constrained', figsize=(15,3))
+        axes[0].set_ylim(ylim)
+
+        if coefficients is None:
+            self.logger.info("Using regression results to plot.")
+            coefficients = self.coefficients
+
+        centers = (self.edges[:, :-1] + self.edges[:, 1:])/2
+        data_binned = jax.vmap(partial(jnp.bincount, weights=self.data * self.weight_model(coefficients), length=self.nbins))(self.data_digitized)
+        chi2_arr = ((self.normalization * data_binned/self.randoms_binned - 1)**2/self.error**2)
+        chi2_arr_noweights = ((self.normalization * self.data_binned_noweights/self.randoms_binned - 1)**2/self.error**2)
+
+        for index, (coefficient_name, coefficient_value, ax) in enumerate(zip(self.template_names, coefficients, axes)):
+            partial_chi2 = (chi2_arr[index]).sum()
+            partial_chi2_noweights = (chi2_arr_noweights[index]).sum()
+            ax.errorbar(centers[index], self.normalization * data_binned[index] / self.randoms_binned[index], self.error[index], fmt='.', label=f"χ² = {partial_chi2:.2f}/{self.nbins} = {partial_chi2/self.nbins:.2f}")
+            ax.errorbar(centers[index], self.normalization * self.data_binned_noweights[index] / self.randoms_binned[index], self.error[index], fmt='.', label=f"χ² = {partial_chi2_noweights:.2f}/{self.nbins} = {partial_chi2_noweights/self.nbins:.2f}")
+
+            hist_data_syst, bins = jnp.histogram(self.template_values_data[index], bins=nbinsh)
+            # x = bins
+            y = hist_data_syst / hist_data_syst.max() * 0.3*(ylim[1]-ylim[0])+ylim[0]
+            ax.stairs(y, bins)
+
+            ax.set_xlabel(coefficient_name)
+            ax.legend()
+        fig.supylabel("Density fluctuations")
+        fig.suptitle(title)
+
 
 
 
