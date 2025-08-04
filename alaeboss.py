@@ -5,6 +5,7 @@ import jax
 import logging
 from functools import partial
 import matplotlib.pyplot as plt
+import numpy as np
 
 @jax.jit
 def my_bincount(idx, accumutalor, weights):
@@ -93,6 +94,30 @@ class LinearRegressor:
         reg = cls.__new__(cls, data_weights=data_weights, random_weights=random_weights, template_values_data=template_values_data, template_values_randoms=template_values_randoms, template_names=template_names, loglevel=loglevel)
         reg._initial_setup(data_weights=data_weights, random_weights=random_weights, template_values_data=template_values_data, template_values_randoms=template_values_randoms, template_names=template_names, loglevel=loglevel)
         return reg
+
+    def save(self, filepath: str):
+        """
+        Save the current instance data to disk. No regression or bin related information is saved. After loading, do not repeat cut_outliers as they are already removed.
+        
+        :param filepath: Path to the file where data should be saved.
+        :type filepath: str
+        """
+        np.savez(file=filepath, data_weights=self.data, random_weights=self.randoms, template_values_data=self.template_values_data, template_values_randoms=self.template_values_randoms,  template_names=np.array(self.template_names))
+        self.logger.info("Saved to %s", filepath)
+
+    @classmethod
+    def load(cls, filepath: str, loglevel: str = "INFO"):
+        """
+        Create a Linear regressor instance from disk.
+        
+        :param cls: Description
+        :param filepath: Description
+        :type filepath: str
+        :param loglevel: Description
+        :type loglevel: str
+        """
+        from_disk = jnp.load(filepath)
+        return cls.from_stacked_templates(data_weights=from_disk["data_weights"], random_weights=from_disk["random_weights"], template_values_data=from_disk["template_values_data"], template_values_randoms=from_disk["template_values_randoms"], template_names=list(from_disk["template_names"]), loglevel=loglevel)
 
     def cut_outliers(self, tail: float = 0.5):
         """
@@ -337,19 +362,19 @@ if __name__ == "__main__":
     sysmap1 = 1*jnp.exp(-jnp.square((sky - 0.25)/0.1)/2)
     sysmap2 = 2*jnp.exp(-jnp.square((sky - 0.75)/0.2)/2)
 
-    data_weights = jnp.ones(shape=(datalen), dtype=float)
-    random_weights = jnp.ones(shape=(randomlen), dtype=float)
+    data_weights_test = jnp.ones(shape=(datalen), dtype=float)
+    random_weights_test = jnp.ones(shape=(randomlen), dtype=float)
 
     data_loc = jrd.choice(key=key1, a=jnp.arange(len(sky)), p=sysmap1 + sysmap2, replace=True, shape=(datalen,))
     random_loc = jrd.choice(key=key2, a=jnp.arange(len(sky)), p=None, replace=True, shape=(randomlen,))
 
-    templates = {
+    templates_test = {
         "syst1": (sysmap1[data_loc], sysmap1[random_loc]),
         "syst2": (sysmap2[data_loc], sysmap2[random_loc]),
     }
 
     t1 = time()
-    r = LinearRegressor(data_weights=data_weights, random_weights=random_weights, templates=templates, loglevel="INFO")
+    r = LinearRegressor(data_weights=data_weights_test, random_weights=random_weights_test, templates=templates_test, loglevel="INFO")
     r.cut_outliers(tail=0.5)
     r.prepare(nbins=nbins)
     res = r.regress_minuit()
