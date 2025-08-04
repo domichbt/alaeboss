@@ -1,3 +1,4 @@
+from __future__ import annotations
 import jax.numpy as jnp
 from jax.scipy.optimize import minimize as jaxminimize
 from jax.typing import ArrayLike
@@ -72,7 +73,7 @@ class LinearRegressor:
         self.logger.debug("Current normalization factor is %f", self.normalization)
 
     @classmethod
-    def from_stacked_templates(cls, data_weights: ArrayLike, random_weights: ArrayLike, template_values_data: ArrayLike, template_values_randoms: ArrayLike, template_names: list[str], loglevel: str = "INFO"):
+    def from_stacked_templates(cls, data_weights: ArrayLike, random_weights: ArrayLike, template_values_data: ArrayLike, template_values_randoms: ArrayLike, template_names: list[str], loglevel: str = "INFO") -> LinearRegressor:
         """
         Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the `cut_outliers`, `prepare` and `regress` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the `weight_model` method on the `coefficients` attribute.
 
@@ -106,7 +107,7 @@ class LinearRegressor:
         self.logger.info("Saved to %s", filepath)
 
     @classmethod
-    def load(cls, filepath: str, loglevel: str = "INFO"):
+    def load(cls, filepath: str, loglevel: str = "INFO") -> LinearRegressor:
         """
         Create a Linear regressor instance from disk.
         
