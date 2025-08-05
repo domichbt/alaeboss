@@ -330,7 +330,7 @@ class LinearRegressor:
         :param title: Optional title
         :type title: str
         """
-        fig, axes = plt.subplots(1, len(self.template_names), sharey=True, layout='constrained', figsize=(15, 3))
+        fig, axes = plt.subplots(1, len(self.template_names), sharey=True, layout='constrained', figsize=(3*len(self.template_names), 3))
         axes[0].set_ylim(ylim)
 
         if coefficients is None:
