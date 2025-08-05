@@ -158,6 +158,7 @@ class LinearRegressor:
         """
         self.logger.info("Setting up %i bins", nbins)
         self.nbins = nbins
+        minimal_dtype = np.min_scalar_type(int(nbins)+1) # save some space (most likely int8 instead of int64)
         self.edges = jnp.linspace(jnp.min(self.template_values_data, axis=1) - self.bin_margin,
                                   jnp.max(self.template_values_data, axis=1) + self.bin_margin, self.nbins+1, axis=1)
 
@@ -168,7 +169,7 @@ class LinearRegressor:
 
         # random bin counts are fixed here, as they do not depend on regression coefficients
         # Equivalent to digitize but faster  # shape (N_sys, len(randoms))
-        self.randoms_digitized = jnp.floor(template_values_randoms_normalized * nbins).astype(int) + 1 - (self.template_values_randoms.T == self.edges[:, -1]).T
+        self.randoms_digitized = jnp.floor(template_values_randoms_normalized * nbins).astype(minimal_dtype) + 1 - (self.template_values_randoms.T == self.edges[:, -1]).T
         self.logger.debug("Digitized randoms")
 
         # no axis-dependent implementation of bincount or histogram so have to initialize and fill array
@@ -177,7 +178,7 @@ class LinearRegressor:
         self.logger.debug("Binned randoms")
 
         # also digitize the data for later use (can simply bincount with updated model weights)
-        self.data_digitized = jnp.floor(self.template_values_data_normalized * nbins).astype(int) + 1 - (self.template_values_data.T == self.edges[:, -1]).T # Equivalent to digitize but faster
+        self.data_digitized = jnp.floor(self.template_values_data_normalized * nbins).astype(minimal_dtype) + 1 - (self.template_values_data.T == self.edges[:, -1]).T # Equivalent to digitize but faster
         self.logger.debug("Digitized data")
         self.data_binned_noweights = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins+2, dtype=float), weights=self.data))(self.data_digitized)
         self.logger.debug("Binned data")
