@@ -188,7 +188,8 @@ class LinearRegressor:
         self.logger.debug("Digitized randoms")
 
         # no axis-dependent implementation of bincount or histogram so have to initialize and fill array
-        self.randoms_binned = jax.vmap(partial(my_bincount, accumutalor=jnp.zeros(self.nbins+2, dtype=float), weights=self.randoms))(self.randoms_digitized)
+        # jax.lax.map because the randoms array can get too big for JAX jax.vmap implementation otherwise
+        self.randoms_binned = jax.lax.map(f=partial(my_bincount, accumutalor=jnp.zeros(self.nbins+2, dtype=float), weights=self.randoms), xs=self.randoms_digitized)
         self.logger.debug("Binned randoms")
 
         # also digitize the data for later use (can simply bincount with updated model weights)
