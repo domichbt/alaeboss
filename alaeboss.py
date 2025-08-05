@@ -277,7 +277,6 @@ class LinearRegressor:
         m.limits = [(None, None)]*len(guess)
         m.errors = [0.1]*len(guess)
 
-        m.strategy = 0
         m.migrad()
         if not m.valid:
             self.logger.error("The optimization failed with status\n%s", m.fmin)
