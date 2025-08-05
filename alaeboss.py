@@ -49,22 +49,6 @@ class LinearRegressor:
         use_float64 = jax.config.jax_enable_x64
         if not use_float64:
             self.logger.warning("`jax_enable_x64` is set to False; this means that computations will be capped to float32. The regression will most likely fail and at least return unexpected results. Are you sure you meant to do this? Otherwise use `jax.config.update('jax_enable_x64', True)")
-
-        if not jnp.can_cast(float, data_weights.dtype, casting="safe"):
-            self.logger.warning("Argument `data_weights` has data type %s which cannot be safely cast to the working precision of the algorithm. Proceeding with UNSAFE casting to %s.",data_weights.dtype, jnp.array(1., dtype=float).dtype)
-            data_weights = data_weights.astype(float)
-
-        if not jnp.can_cast(float, random_weights.dtype, casting="safe"):
-            self.logger.warning("Argument `random_weights` has data type %s which cannot be safely cast to the working precision of the algorithm. Proceeding with UNSAFE casting to %s.",random_weights.dtype, jnp.array(1., dtype=float).dtype)
-            random_weights = random_weights.astype(float)
-
-        if not jnp.can_cast(float, template_values_data.dtype, casting="safe"):
-            self.logger.warning("Argument `template_values_data` has data type %s which cannot be safely cast to the working precision of the algorithm. Proceeding with UNSAFE casting to %s.", template_values_data.dtype, jnp.array(1., dtype=float).dtype)
-            template_values_data = template_values_data.astype(float)
-
-        if not jnp.can_cast(float, template_values_randoms.dtype, casting="safe"):
-            self.logger.warning("Argument `template_values_randoms` has data type %s which cannot be safely cast to the working precision of the algorithm. Proceeding with UNSAFE casting to %s.", template_values_randoms.dtype, jnp.array(1., dtype=float).dtype)
-            template_values_randoms = template_values_randoms.astype(float)
                 
         self.template_names = template_names
         self.logger.info("Setting up %i templates", len(self.template_names))
