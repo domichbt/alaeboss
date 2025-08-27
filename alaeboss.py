@@ -1,12 +1,15 @@
 from __future__ import annotations
-import jax.numpy as jnp
-from jax.scipy.optimize import minimize as jaxminimize
-from jax.typing import ArrayLike
-import jax
+
 import logging
 from functools import partial
+
+import jax
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
+from jax.scipy.optimize import minimize as jaxminimize
+from jax.typing import ArrayLike
+
 
 @jax.jit
 def my_bincount(idx, accumutalor, weights):
@@ -355,6 +358,7 @@ if __name__ == "__main__":
     jax.config.update('jax_enable_x64', True)
 
     from time import time
+
     import jax.random as jrd
     use_float64 = jax.config.jax_enable_x64
     key1 = jrd.key(1234)
