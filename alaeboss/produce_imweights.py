@@ -303,5 +303,8 @@ def produce_imweights(
         int(time_end - time_start),
     )
 
+    all_data[output_column_name] = 1.0
     all_data[output_column_name][data_selection] = weights_imlin
-    common.write_LSS_scratchcp(dat, data_catalog_path, logger=logger)
+    common.write_LSS_scratchcp(
+        dat, str(data_catalog_path), logger=logger
+    )  # LSS logging cannot handle Path objects
