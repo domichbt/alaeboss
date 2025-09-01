@@ -35,7 +35,7 @@ import numpy as np
 from astropy.table import Table
 from LSS.imaging import densvar
 
-from .linear_regression import LinearRegressor
+from alaeboss.linear_regression import LinearRegressor
 
 
 def produce_imweights(
