@@ -1,5 +1,3 @@
-from time import time
-
 import jax
 import jax.numpy as jnp
 import jax.random as jrd
@@ -45,7 +43,6 @@ class TestLinearRegressor:
             "syst2": (sysmap2[data_loc], sysmap2[random_loc]),
         }
 
-        t1 = time()
         r = LinearRegressor(
             data_weights=data_weights_test,
             random_weights=random_weights_test,
@@ -55,7 +52,6 @@ class TestLinearRegressor:
         r.cut_outliers(tail=0.5)
         r.prepare(nbins=self.nbins)
         res = r.regress_minuit()
-        t2 = time()
         diff_dict = {name:(res[name]-k2)/k2 for name, k2 in expected_res.items()}
 
         res_tab = np.array(list(res.values()))
