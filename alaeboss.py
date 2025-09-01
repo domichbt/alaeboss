@@ -1,4 +1,7 @@
-from __future__ import annotations
+try:
+    from typing import Self
+except ImportError:
+    from typing_extensions import Self
 
 import logging
 from functools import partial
@@ -143,7 +146,7 @@ class LinearRegressor:
         template_values_randoms: ArrayLike,
         template_names: list[str],
         loglevel: str = "INFO",
-    ) -> LinearRegressor:
+    ) -> Self:
         """
         Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the `cut_outliers`, `prepare` and `regress` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the `weight_model` method on the `coefficients` attribute.
 
@@ -199,7 +202,7 @@ class LinearRegressor:
         self.logger.info("Saved to %s", filepath)
 
     @classmethod
-    def load(cls, filepath: str, loglevel: str = "INFO") -> LinearRegressor:
+    def load(cls, filepath: str, loglevel: str = "INFO") -> Self:
         """
         Create a Linear regressor instance from disk.
 
