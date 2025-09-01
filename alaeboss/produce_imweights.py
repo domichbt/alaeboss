@@ -277,7 +277,7 @@ def produce_imweights(
                 output_directory
                 / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
             )
-            logger.info(f"Writing to {output_loc}", logger)
+            logger.info(f"Writing to {output_loc}")
             with open(output_loc, "w") as fo:
                 for par_name, par_value in optimized_parameters.items():
                     fo.write(str(par_name) + " " + str(par_value) + "\n")
@@ -287,7 +287,7 @@ def produce_imweights(
                     output_directory
                     / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
                 )
-                logger.info(f"Saving figure to {figname}", logger)
+                logger.info(f"Saving figure to {figname}")
                 fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
                 fig.savefig(figname)
 
