@@ -1,5 +1,5 @@
 """
-Utility function to regress imaging systematic weights on DESI data as is done in `mkCat_main.py` using methods in alaeboss.py.
+Utility function to regress imaging systematic weights on DESI data as is done in `mkCat_main.py` using methods in linear_regression.py.
 
 Correspondence between arguments and variables in `mkCat_main.py`:
 
@@ -35,7 +35,7 @@ import numpy as np
 from astropy.table import Table
 from LSS.imaging import densvar
 
-from .alaeboss import LinearRegressor
+from .linear_regression import LinearRegressor
 
 
 def produce_imweights(
