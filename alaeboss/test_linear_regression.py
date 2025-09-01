@@ -8,6 +8,7 @@ from .linear_regression import LinearRegressor
 
 jax.config.update("jax_enable_x64", True)
 
+
 class TestLinearRegressor:
     key1 = jrd.key(1234)
     key2 = jrd.key(5678)
@@ -16,7 +17,11 @@ class TestLinearRegressor:
     nbins = 10
 
     def test_whole_regression(self):
-        expected_res = {'constant': -0.9952391264847271, 'syst1': 0.8370850695798598, 'syst2': 1.677471769169541}
+        expected_res = {
+            "constant": -0.9952391264847271,
+            "syst1": 0.8370850695798598,
+            "syst2": 1.677471769169541,
+        }
 
         # The sky is a beautiful 1-D array with two gaussian hotpoints of systematics
         # The data follows this distribution closely, and we write down the associated values of the systematics at this point
@@ -35,7 +40,11 @@ class TestLinearRegressor:
             shape=(self.datalen,),
         )
         random_loc = jrd.choice(
-            key=self.key2, a=jnp.arange(len(sky)), p=None, replace=True, shape=(self.randomlen,)
+            key=self.key2,
+            a=jnp.arange(len(sky)),
+            p=None,
+            replace=True,
+            shape=(self.randomlen,),
         )
 
         templates_test = {
@@ -52,16 +61,15 @@ class TestLinearRegressor:
         r.cut_outliers(tail=0.5)
         r.prepare(nbins=self.nbins)
         res = r.regress_minuit()
-        diff_dict = {name:(res[name]-k2)/k2 for name, k2 in expected_res.items()}
+        diff_dict = {name: (res[name] - k2) / k2 for name, k2 in expected_res.items()}
 
         res_tab = np.array(list(res.values()))
         expected_res_tab = np.array(list(expected_res.values()))
 
         npt.assert_allclose(
-            res_tab, 
+            res_tab,
             expected_res_tab,
             rtol=1e-6,
             atol=1e-6,
             err_msg=f"Test failed with relative differences for each coefficient: {diff_dict}",
         )
-
