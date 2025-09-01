@@ -6,7 +6,7 @@ import jax.random as jrd
 import numpy as np
 import numpy.testing as npt
 
-from alaeboss import LinearRegressor
+from .alaeboss import LinearRegressor
 
 jax.config.update("jax_enable_x64", True)
 
