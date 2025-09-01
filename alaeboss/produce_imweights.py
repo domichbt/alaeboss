@@ -33,9 +33,17 @@ import jax
 import LSS.common_tools as common
 import numpy as np
 from astropy.table import Table
-from LSS.imaging import densvar
+import healpy as hp
 
 from alaeboss.linear_regression import LinearRegressor
+
+
+def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nest):
+    pixnums = hp.ang2pix(nside, np.radians(-dec + 90), np.radians(ra), nest=nest)
+    systematics_values = sys_tab[use_maps][pixnums]
+    return np.vstack(
+        [systematics_values[column_name] for column_name in systematics_values.colnames]
+    )
 
 
 def produce_imweights(
@@ -56,6 +64,8 @@ def produce_imweights(
     # Miscellaneous
     logger: logging.Logger = None,
     loglevel: str = "INFO",
+    templates_maps_nside: int = 256,
+    templates_maps_nested: bool = True,
 ):
     """
     Perform linear regression to compute imaging systematics weights for a given tracer type, data catalog, random catalogs, set of maps.
@@ -75,6 +85,10 @@ def produce_imweights(
         Path to the South region imaging systematics templates file.
     templates_maps_path_N : str
         Path to the North region imaging systematics templates file.
+    templates_maps_nside : int
+        Nside for the template maps that are being loaded from this path. Default is 256.
+    templates_maps_nested : bool
+        Whether template maps are in the nested scheme. Default is True.
     fit_maps : list[str]
         List of template map names to use in the regression.
     output_directory : str
@@ -204,11 +218,13 @@ def produce_imweights(
         region_randoms = rands[region_mask_randoms]
         # rand_syst = densvar.read_systematic_maps_alt(region_randoms['RA'], region_randoms['DEC'], sys_tab, use_maps)
         logger.info("Reading template values for the randoms")
-        randoms_templates_values = densvar.read_systematic_templates_stacked_alt(
-            region_randoms["RA"],
-            region_randoms["DEC"],
-            sys_tab,
-            fit_maps,
+        randoms_templates_values = read_systematic_templates_stacked_alt(
+            ra=region_randoms["RA"],
+            dec=region_randoms["DEC"],
+            sys_tab=sys_tab,
+            use_maps=fit_maps,
+            nside=templates_maps_nside,
+            nest=templates_maps_nested,
         )
         logger.info(
             f"Preparation for region {region} is done. Starting regressions per redshift slide."
@@ -231,11 +247,13 @@ def produce_imweights(
             # don't select randoms further because we're not using the clustering catalogs anyways
 
             # get data imaging systematics
-            data_templates_values = densvar.read_systematic_templates_stacked_alt(
-                selected_data["RA"],
-                selected_data["DEC"],
-                sys_tab,
-                fit_maps,
+            data_templates_values = read_systematic_templates_stacked_alt(
+                ra=selected_data["RA"],
+                dec=selected_data["DEC"],
+                sys_tab=sys_tab,
+                use_maps=fit_maps,
+                nside=templates_maps_nside,
+                nest=templates_maps_nested,
             )
 
             # add weights
