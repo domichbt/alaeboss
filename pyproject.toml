@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alaeboss"
+version = "0.0.1"
+description = "Linear regressions for imaging systematics, 'à la eBOSS', in JAX."
+authors = [
+    { name="Domitille Chebat", email="dochebat@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "jax",
+    "iminuit",
+    "matplotlib",
+]
+
+[project.optional-dependencies]
+DESI=["healpy", "astropy"]
