@@ -48,7 +48,7 @@ def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nes
 
 def produce_imweights(
     # Input and output control
-    data_catalog_path: str,
+    data_catalog_paths: list[str],
     random_catalogs_paths: list[str],
     is_clustering_catalog: bool,
     tracer_type: str,
@@ -76,8 +76,8 @@ def produce_imweights(
 
     Parameters
     ----------
-    data_catalog_path : str
-        Path to the input data catalog FITS file.
+    data_catalog_path : list[str]
+        Path to the input data catalogs FITS files.
     random_catalogs_paths : list[str]
         List of paths to random catalogs FITS files.
     tracer_type : str
@@ -155,7 +155,12 @@ def produce_imweights(
 
     # read data catalogs
     logger.info("Reading data catalogs")
-    all_data = Table(fitsio.read(data_catalog_path))
+    all_data = Table(
+            np.concatenate(
+                [fitsio.read(data_catalog_path) for data_catalog_path in data_catalog_paths]
+            )
+        )
+    logger.warning(len(all_data))
     # read randoms catalogs (note that since we are reading a subset of columns, this can take a lot on time from a job, no idea why)
     logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
     rands = np.concatenate(
