@@ -56,9 +56,9 @@ def produce_imweights(
     templates_maps_path_S: str,
     templates_maps_path_N: str,
     fit_maps: list[str],
-    output_directory: str,
+    output_directory: str | None,
     weight_scheme: str,
-    output_column_name: str = "WEIGHT_IMLIN",
+    output_column_name: str | None = "WEIGHT_IMLIN",
     save_summary_plots: bool = True,
     # Regression-specific arguments
     nbins: int = 10,
@@ -93,8 +93,8 @@ def produce_imweights(
         Whether template maps are in the nested scheme. Default is True.
     fit_maps : list[str]
         List of template map names to use in the regression.
-    output_directory : str
-        Directory where output plots and parameter files will be saved.
+    output_directory : str or None
+        Directory where output plots and parameter files will be saved. If None, nothing is saved.
     weight_scheme : str
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
             * `fracz`: 1/(`FRACZ_TILELOCID` * `FRAC_TLOBS_TILES`) for the data, 1 for the randoms.
@@ -104,8 +104,8 @@ def produce_imweights(
             
         In all previous cases, if `WEIGHT_ZFAIL` is available, the weights will be multiplied by it. The standard for full catalogs is "fracz".
         If you are using **clustering** catalogs, *ie* if `is_clustering_catalog` is set to True, `weight_scheme` should be set to None as it will not be used.
-    output_column_name : str, optional
-        Name of the output column to store computed weights in the data catalog (default is "WEIGHT_IMLIN").
+    output_column_name : str or None, optional
+        Name of the output column to store computed weights in the data catalog (default is "WEIGHT_IMLIN"). If set to None, the original catalog will be left untouched.
     save_summary_plots : bool, optional
         Whether to save summary plots of the regression results (default is True).
     nbins : int, optional
@@ -147,7 +147,8 @@ def produce_imweights(
 
     debv = common.get_debv()  # for later
     sky_g, sky_r, sky_z = common.get_skyres()
-    output_directory = Path(output_directory)
+    if output_directory is not None:
+        output_directory = Path(output_directory)
 
     # read data catalogs
     logger.info("Reading data catalogs")
@@ -349,23 +350,26 @@ def produce_imweights(
             logger.info("Regression done!")
             logger.info(f"Optimized parameters are {optimized_parameters}")
 
-            output_loc = (
-                output_directory
-                / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
-            )
-            logger.info(f"Writing to {output_loc}")
-            with open(output_loc, "w") as fo:
-                for par_name, par_value in optimized_parameters.items():
-                    fo.write(str(par_name) + " " + str(par_value) + "\n")
-
-            if save_summary_plots:
-                figname = (
+            if output_directory is not None:
+                output_loc = (
                     output_directory
-                    / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
+                    / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
                 )
-                logger.info(f"Saving figure to {figname}")
-                fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
-                fig.savefig(figname)
+                logger.info(f"Writing to {output_loc}")
+                with open(output_loc, "w") as fo:
+                    for par_name, par_value in optimized_parameters.items():
+                        fo.write(str(par_name) + " " + str(par_value) + "\n")
+
+                if save_summary_plots:
+                    figname = (
+                        output_directory
+                        / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
+                    )
+                    logger.info(f"Saving figure to {figname}")
+                    fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
+                    fig.savefig(figname)
+            else:
+                logger.info("`output_directory` set to None; not writing plots or parameters.")
 
             weights_imlin[selection_data] = regressor.export_weights()
             t2 = time()
