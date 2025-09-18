@@ -118,9 +118,10 @@ def produce_imweights(
         Logging level for the regressor's logger (default is "INFO"). Will not affect `logger`'s level.
     Returns
     -------
-    None
+    numpy.ndarray
         The function modifies the input data catalog in place by adding or updating the output_column_name
         with computed imaging weights, and writes regression parameters and plots to the output directory.
+        The computed imaging weights are returned as an array (same shape as the input data, set to 1.0 where weights weren't computed.)
     Notes
     -----
     Loading some columns only from FITS file during NERSC jobs can be very long for mysterious reasons. If you are experiencing huge catalog readtimes, this might be why.
@@ -378,8 +379,14 @@ def produce_imweights(
         int(time_end - time_start),
     )
 
-    all_data[output_column_name] = 1.0
-    all_data[output_column_name][data_selection] = weights_imlin
-    common.write_LSS_scratchcp(
-        dat, str(data_catalog_path), logger=logger
-    )  # LSS logging cannot handle Path objects
+    if output_column_name is not None:
+        all_data[output_column_name] = 1.0
+        all_data[output_column_name][data_selection] = weights_imlin
+        common.write_LSS_scratchcp(
+            dat, str(data_catalog_path), logger=logger
+        )  # LSS logging cannot handle Path objects
+        return all_data[output_column_name]
+    else:
+        all_data_weights = np.ones_like(all_data[redshift_colname], dtype=float)
+        all_data_weights[data_selection] = weights_imlin
+        return weights_imlin
