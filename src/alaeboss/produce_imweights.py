@@ -57,6 +57,7 @@ def produce_imweights(
     templates_maps_path_N: str,
     fit_maps: list[str],
     output_directory: str | None,
+    output_catalog_path: str | None,
     weight_scheme: str,
     output_column_name: str | None = "WEIGHT_IMLIN",
     save_summary_plots: bool = True,
@@ -95,6 +96,8 @@ def produce_imweights(
         List of template map names to use in the regression.
     output_directory : str or None
         Directory where output plots and parameter files will be saved. If None, nothing is saved.
+    output_catalog_path : str or None
+        Path to the catalog where the output weights should be written. If None, no output is written.
     weight_scheme : str
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
             * `fracz`: 1/(`FRACZ_TILELOCID` * `FRAC_TLOBS_TILES`) for the data, 1 for the randoms.
@@ -383,11 +386,11 @@ def produce_imweights(
         int(time_end - time_start),
     )
 
-    if output_column_name is not None:
+    if (output_column_name is not None) and (output_catalog_path is not None):
         all_data[output_column_name] = 1.0
         all_data[output_column_name][data_selection] = weights_imlin
         common.write_LSS_scratchcp(
-            dat, str(data_catalog_path), logger=logger
+            dat, str(output_catalog_path), logger=logger
         )  # LSS logging cannot handle Path objects
         return all_data[output_column_name]
     else:
