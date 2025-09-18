@@ -282,7 +282,7 @@ def produce_imweights(
                 logger.info("Clustering catalogs : selecting randoms")
                 selection_randoms = (region_randoms[redshift_colname] > z_range[0]) & (region_randoms[redshift_colname] < z_range[1])
                 selected_randoms = region_randoms[selection_randoms]
-                selected_randoms_templates_values = randoms_templates_values[selected_randoms]
+                selected_randoms_templates_values = randoms_templates_values[:, selection_randoms]
             else:
                 selected_randoms = region_randoms
                 selected_randoms_templates_values = randoms_templates_values
@@ -298,7 +298,7 @@ def produce_imweights(
                 nest=templates_maps_nested,
             )
 
-            data_we = jax.numpy.ones_like(selection_data, dtype=float)
+            data_we = jax.numpy.ones_like(selected_data[redshift_colname], dtype=float)
             rand_we = jax.numpy.ones_like(selected_randoms, dtype=float)
 
             # add weights
