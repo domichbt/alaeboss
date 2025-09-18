@@ -359,6 +359,7 @@ def produce_imweights(
             logger.info(f"Optimized parameters are {optimized_parameters}")
 
             if output_directory is not None:
+                output_directory.mkdir(parents=True, exist_ok=True)
                 output_loc = (
                     output_directory
                     / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
