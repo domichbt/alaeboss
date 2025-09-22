@@ -143,6 +143,9 @@ def produce_imweights(
             )
         redshift_colname = "Z"
     else:
+        assert weight_scheme is not None, (
+            "Must define a weight scheme when using full catalogs."
+        )
         redshift_colname = "Z_not4clus"
 
     jax.config.update("jax_enable_x64", True)
