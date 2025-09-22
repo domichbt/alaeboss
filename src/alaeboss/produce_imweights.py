@@ -387,18 +387,20 @@ def produce_imweights(
 
     time_end = time()
     logger.info(
-        "All linear regressions are done, took %i seconds. Now writing to disk",
+        "All linear regressions are done, took %i seconds.",
         int(time_end - time_start),
     )
 
     if (output_column_name is not None) and (output_catalog_path is not None):
         all_data[output_column_name] = 1.0
         all_data[output_column_name][data_selection] = weights_imlin
+        logger.info("Writing to disk at %s", output_catalog_path)
         common.write_LSS_scratchcp(
             dat, str(output_catalog_path), logger=logger
         )  # LSS logging cannot handle Path objects
         return all_data[output_column_name]
     else:
+        logger.info("Not writing results to disk.")
         all_data_weights = np.ones_like(all_data[redshift_colname], dtype=float)
         all_data_weights[data_selection] = weights_imlin
         return weights_imlin
