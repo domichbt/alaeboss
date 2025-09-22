@@ -16,7 +16,19 @@ dependencies = [
     "jax",
     "iminuit",
     "matplotlib",
+    "numpydoc",
+    "sphinx-book-theme"
 ]
 
 [project.optional-dependencies]
 DESI=["healpy", "astropy"]
+
+[tool.ruff.lint]
+select = ["E"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
