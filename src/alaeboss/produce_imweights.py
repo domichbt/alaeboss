@@ -46,17 +46,100 @@ def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nes
     )
 
 
+def columns_for_weight_scheme(
+    weight_scheme: str | None,
+    redshift_colname: str,
+    tracer: str,
+) -> tuple[set, set]:
+    """
+    Return the columns needed for the data and the randoms given the weight computation of `lklmini.produce_imweights.produce_imweights`, as a tuple of sets.
+
+    Parameters
+    ----------
+    weight_scheme : str or None
+        Weighting scheme used in the linear regression, see documentation of `lklmini.produce_imweights.produce_imweights`. If set to None, corresponds to the clustering catalog option.
+    redshift_colname : str
+        Name of the column containing redshift information ("Z" or "Z_not4clus").
+    tracer : str
+        Name of the tracer. Useful for the full catalog (columns needed in `goodz_infull`).
+
+    Returns
+    -------
+    tuple[set, set]
+        Two sets listing the required columns for the data and randoms respectively.
+
+    Raises
+    ------
+    KeyError
+        In the event of an unrecognized `weight_scheme` or `tracer`.
+    """
+    data_colnames = {
+        "RA",
+        "DEC",
+        "PHOTSYS",
+        redshift_colname,
+    }
+    randoms_colnames = {
+        "RA",
+        "DEC",
+        "PHOTSYS",
+    }
+
+    match tracer:
+        case "ELG":
+            data_colnames |= {"o2c"}
+        case "LRG" | "BGS":
+            data_colnames |= {"ZWARN", "DELTACHI2"}
+        case "QSO":
+            pass
+        case _:
+            raise KeyError("Unrecognized tracer %s", tracer)
+
+    match weight_scheme:
+        case None:  # clustering catalog
+            return (
+                data_colnames | {"WEIGHT", "WEIGHT_FKP", "WEIGHT_SYS", "WEIGHT_ZFAIL"},
+                randoms_colnames
+                | {
+                    "WEIGHT",
+                    "WEIGHT_FKP",
+                    "WEIGHT_SYS",
+                    "WEIGHT_ZFAIL",
+                    redshift_colname,
+                },
+            )
+        case "fracz":  # 1/FRACZ_TILELOCID based completeness weights
+            return (
+                data_colnames | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
+                randoms_colnames,
+            )
+        case "wt":  # whole weight column
+            return (data_colnames | {"WEIGHT"}, randoms_colnames | {"WEIGHT"})
+        case "wtfkp":  # whole weight column plus FKP
+            return (
+                data_colnames | {"WEIGHT", "WEIGHT_FKP"},
+                randoms_colnames | {"WEIGHT", "WEIGHT_FKP"},
+            )
+        case "wt_comp":  # WEIGHT_COMP
+            return (data_colnames | {"WEIGHT_COMP"}, randoms_colnames | {"WEIGHT_COMP"})
+        case _:
+            raise KeyError("Weight scheme %s is not recognized.", weight_scheme)
+
+
 def produce_imweights(
     # Input and output control
-    data_catalog_path: str,
+    data_catalog_paths: list[str],
     random_catalogs_paths: list[str],
+    is_clustering_catalog: bool,
     tracer_type: str,
     redshift_range: list[(float, float)],
     templates_maps_path_S: str,
     templates_maps_path_N: str,
     fit_maps: list[str],
-    output_directory: str,
-    output_column_name: str = "WEIGHT_IMLIN",
+    output_directory: str | None,
+    output_catalog_path: str | None,
+    weight_scheme: str,
+    output_column_name: str | None = "WEIGHT_IMLIN",
     save_summary_plots: bool = True,
     # Regression-specific arguments
     nbins: int = 10,
@@ -73,8 +156,8 @@ def produce_imweights(
 
     Parameters
     ----------
-    data_catalog_path : str
-        Path to the input data catalog FITS file.
+    data_catalog_path : list[str]
+        Path to the input data catalogs FITS files.
     random_catalogs_paths : list[str]
         List of paths to random catalogs FITS files.
     tracer_type : str
@@ -91,10 +174,21 @@ def produce_imweights(
         Whether template maps are in the nested scheme. Default is True.
     fit_maps : list[str]
         List of template map names to use in the regression.
-    output_directory : str
-        Directory where output plots and parameter files will be saved.
-    output_column_name : str, optional
-        Name of the output column to store computed weights in the data catalog (default is "WEIGHT_IMLIN").
+    output_directory : str or None
+        Directory where output plots and parameter files will be saved. If None, nothing is saved.
+    output_catalog_path : str or None
+        Path to the catalog where the output weights should be written. If None, no output is written.
+    weight_scheme : str
+        Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
+            * `fracz`: 1/(`FRACZ_TILELOCID` * `FRAC_TLOBS_TILES`) for the data, 1 for the randoms.
+            * `wt`: `WEIGHT` column from the catalog for the data and for the randoms
+            * `wtfkp`: FKP weights, *ie* `WEIGHT` * `WEIGHT_FKP` for both data and randoms.
+            * `wt_comp`: `WEIGHT_COMP` column for the data, 1 for the randoms.
+
+        In all previous cases, if `WEIGHT_ZFAIL` is available, the weights will be multiplied by it. The standard for full catalogs is "fracz".
+        If you are using **clustering** catalogs, *ie* if `is_clustering_catalog` is set to True, `weight_scheme` should be set to None as it will not be used.
+    output_column_name : str or None, optional
+        Name of the output column to store computed weights in the data catalog (default is "WEIGHT_IMLIN"). If set to None, the original catalog will be left untouched.
     save_summary_plots : bool, optional
         Whether to save summary plots of the regression results (default is True).
     nbins : int, optional
@@ -107,9 +201,10 @@ def produce_imweights(
         Logging level for the regressor's logger (default is "INFO"). Will not affect `logger`'s level.
     Returns
     -------
-    None
+    numpy.ndarray
         The function modifies the input data catalog in place by adding or updating the output_column_name
         with computed imaging weights, and writes regression parameters and plots to the output directory.
+        The computed imaging weights are returned as an array (same shape as the input data, set to 1.0 where weights weren't computed.)
     Notes
     -----
     Loading some columns only from FITS file during NERSC jobs can be very long for mysterious reasons. If you are experiencing huge catalog readtimes, this might be why.
@@ -119,35 +214,68 @@ def produce_imweights(
 
     logger.info("Doing linear regression for imaging systematics")
 
+    # Test that input parameters are compatible
+    if is_clustering_catalog:
+        logger.debug("The input catalogs are clustering catalogs...")
+        if weight_scheme is not None:
+            raise ValueError(
+                "Cannot choose a weight scheme when using clustering catalogs ; `weight_scheme` should be set to `None`."
+            )
+        redshift_colname = "Z"
+    else:
+        assert weight_scheme is not None, (
+            "Must define a weight scheme when using full catalogs."
+        )
+        redshift_colname = "Z_not4clus"
+
     jax.config.update("jax_enable_x64", True)
     logger.info("Enabled 64-bit mode for JAX")
 
     time_start = time()
 
+    # define which columns will need to be loaded for the data and the randoms
+    data_colnames, random_colnames = columns_for_weight_scheme(
+        weight_scheme=weight_scheme,
+        redshift_colname=redshift_colname,
+        tracer=tracer_type[:3],
+    )
+    data_colnames = list(data_colnames)
+    random_colnames = list(random_colnames)
+    logger.debug("Columns to load for the data: %s", data_colnames)
+    logger.debug("Columns to load for the randoms: %s", random_colnames)
+
     debv = common.get_debv()  # for later
     sky_g, sky_r, sky_z = common.get_skyres()
-    output_directory = Path(output_directory)
+    if output_directory is not None:
+        output_directory = Path(output_directory)
 
     # read data catalogs
     logger.info("Reading data catalogs")
-    all_data = Table(fitsio.read(data_catalog_path))
+    all_data = Table(
+        np.concatenate(
+            [
+                fitsio.read(data_catalog_path, columns=data_colnames)
+                for data_catalog_path in data_catalog_paths
+            ]
+        )
+    )
     # read randoms catalogs (note that since we are reading a subset of columns, this can take a lot on time from a job, no idea why)
     logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
     rands = np.concatenate(
         [
-            fitsio.read(
-                random_catalog_path,
-                columns=["RA", "DEC", "PHOTSYS"],
-            )
+            fitsio.read(random_catalog_path, columns=random_colnames)
             for random_catalog_path in random_catalogs_paths
         ]
     )
 
     # select good data that has been observed
-    logger.info("Selecting good and observed data")
-    data_selection = common.goodz_infull(tracer_type[:3], all_data) & (
-        all_data["ZWARN"] != 999999
-    )
+    if not is_clustering_catalog:
+        logger.info("Selecting good and observed data")
+        data_selection = common.goodz_infull(tracer_type[:3], all_data) & (
+            all_data["ZWARN"] != 999999
+        )
+    else:
+        data_selection = np.full_like(all_data, fill_value=True, dtype=bool)
     dat = all_data[data_selection]
 
     # prepare array to receive computed weights
@@ -239,12 +367,24 @@ def produce_imweights(
             logger.info("Selecting data and loading template values")
             selection_data = (
                 region_mask_data
-                & (dat["Z_not4clus"] > z_range[0])
-                & (dat["Z_not4clus"] < z_range[1])
+                & (dat[redshift_colname] > z_range[0])
+                & (dat[redshift_colname] < z_range[1])
             )
             selected_data = dat[selection_data]
 
-            # don't select randoms further because we're not using the clustering catalogs anyways
+            # if using clustering catalogs, select randoms further
+            if is_clustering_catalog:
+                logger.info("Clustering catalogs : selecting randoms")
+                selection_randoms = (region_randoms[redshift_colname] > z_range[0]) & (
+                    region_randoms[redshift_colname] < z_range[1]
+                )
+                selected_randoms = region_randoms[selection_randoms]
+                selected_randoms_templates_values = randoms_templates_values[
+                    :, selection_randoms
+                ]
+            else:
+                selected_randoms = region_randoms
+                selected_randoms_templates_values = randoms_templates_values
 
             # get data imaging systematics
             data_templates_values = read_systematic_templates_stacked_alt(
@@ -256,31 +396,70 @@ def produce_imweights(
                 nest=templates_maps_nested,
             )
 
+            data_we = jax.numpy.ones_like(selected_data[redshift_colname], dtype=float)
+            rand_we = jax.numpy.ones_like(selected_randoms, dtype=float)
+
             # add weights
             datacols = list(selected_data.dtype.names)
             logger.info(f"Found columns {cols}")
-            logger.info("Using 1/FRACZ_TILELOCID based completeness weights")
-            wts = 1 / selected_data["FRACZ_TILELOCID"]
-            if "FRAC_TLOBS_TILES" in datacols:
-                logger.info("Using FRAC_TLOBS_TILES")
-                wts *= 1 / selected_data["FRAC_TLOBS_TILES"]
-            else:
-                logger.info("no FRAC_TLOBS_TILES")
-            if "WEIGHT_ZFAIL" in datacols:
-                logger.info("Using redshift failure weights")
-                wts *= selected_data["WEIGHT_ZFAIL"]
-            else:
-                logger.info("no redshift failure weights")
 
-            data_we = jax.numpy.array(wts)
-            rand_we = jax.numpy.ones_like(region_randoms, dtype=float)
+            match weight_scheme:
+                case None:
+                    assert is_clustering_catalog, (
+                        "Cannot set weight_scheme to None if the catalogs are not clustering catalogs!"
+                    )
+                    logger.info(
+                        "Clustering catalogs: using WEIGHT * WEIGHT_FKP / WEIGHT_SYS"
+                    )
+                    data_we *= (
+                        selected_data["WEIGHT"]
+                        * selected_data["WEIGHT_FKP"]
+                        / selected_data["WEIGHT_SYS"]
+                        / selected_data["WEIGHT_ZFAIL"]
+                    )  # will be re-multiplied by WEIGHT_ZFAIL later
+                    rand_we *= (
+                        selected_randoms["WEIGHT"]
+                        * selected_randoms["WEIGHT_FKP"]
+                        / selected_randoms["WEIGHT_SYS"]
+                        / selected_randoms["WEIGHT_ZFAIL"]
+                    )
+                case "fracz":
+                    logger.info("Using 1/FRACZ_TILELOCID based completeness weights")
+                    data_we /= selected_data["FRACZ_TILELOCID"]
+                    if "FRAC_TLOBS_TILES" in datacols:
+                        logger.info("Using FRAC_TLOBS_TILES")
+                        data_we /= selected_data["FRAC_TLOBS_TILES"]
+                    else:
+                        logger.info("no FRAC_TLOBS_TILES")
+                case "wt":
+                    logger.info("Using the WEIGHT column directly")
+                    data_we *= selected_data["WEIGHT"]
+                    rand_we *= selected_randoms["WEIGHT"]
+                case "wtfkp":
+                    logger.info("Using FKP weights and WEIGHT")
+                    data_we *= selected_data["WEIGHT"] * selected_data["WEIGHT_FKP"]
+                    rand_we *= (
+                        selected_randoms["WEIGHT"] * selected_randoms["WEIGHT_FKP"]
+                    )
+                case "wt_comp":
+                    logger.info("Using WEIGHT_COMP column directly")
+                    data_we *= selected_data["WEIGHT_COMP"]
+                    rand_we *= selected_randoms["WEIGHT_COMP"]
+                case _:
+                    logger.warning("Weight scheme %s is not recognized.", weight_scheme)
+
+            if "WEIGHT_ZFAIL" in datacols:
+                logger.info("Adding redshift failure weights to data weights")
+                data_we *= selected_data["WEIGHT_ZFAIL"]
+            else:
+                logger.info("No redshift failure weights")
 
             logger.info("Starting regression...")
             regressor = LinearRegressor.from_stacked_templates(
                 data_weights=data_we,
                 random_weights=rand_we,
                 template_values_data=data_templates_values,
-                template_values_randoms=randoms_templates_values,
+                template_values_randoms=selected_randoms_templates_values,
                 template_names=fit_maps,
                 loglevel=loglevel,
             )
@@ -291,23 +470,29 @@ def produce_imweights(
             logger.info("Regression done!")
             logger.info(f"Optimized parameters are {optimized_parameters}")
 
-            output_loc = (
-                output_directory
-                / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
-            )
-            logger.info(f"Writing to {output_loc}")
-            with open(output_loc, "w") as fo:
-                for par_name, par_value in optimized_parameters.items():
-                    fo.write(str(par_name) + " " + str(par_value) + "\n")
-
-            if save_summary_plots:
-                figname = (
+            if output_directory is not None:
+                output_directory.mkdir(parents=True, exist_ok=True)
+                output_loc = (
                     output_directory
-                    / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
+                    / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
                 )
-                logger.info(f"Saving figure to {figname}")
-                fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
-                fig.savefig(figname)
+                logger.info(f"Writing to {output_loc}")
+                with open(output_loc, "w") as fo:
+                    for par_name, par_value in optimized_parameters.items():
+                        fo.write(str(par_name) + " " + str(par_value) + "\n")
+
+                if save_summary_plots:
+                    figname = (
+                        output_directory
+                        / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
+                    )
+                    logger.info(f"Saving figure to {figname}")
+                    fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
+                    fig.savefig(figname)
+            else:
+                logger.info(
+                    "`output_directory` set to None; not writing plots or parameters."
+                )
 
             weights_imlin[selection_data] = regressor.export_weights()
             t2 = time()
@@ -317,12 +502,20 @@ def produce_imweights(
 
     time_end = time()
     logger.info(
-        "All linear regressions are done, took %i seconds. Now writing to disk",
+        "All linear regressions are done, took %i seconds.",
         int(time_end - time_start),
     )
 
-    all_data[output_column_name] = 1.0
-    all_data[output_column_name][data_selection] = weights_imlin
-    common.write_LSS_scratchcp(
-        dat, str(data_catalog_path), logger=logger
-    )  # LSS logging cannot handle Path objects
+    if (output_column_name is not None) and (output_catalog_path is not None):
+        all_data[output_column_name] = 1.0
+        all_data[output_column_name][data_selection] = weights_imlin
+        logger.info("Writing to disk at %s", output_catalog_path)
+        common.write_LSS_scratchcp(
+            dat, str(output_catalog_path), logger=logger
+        )  # LSS logging cannot handle Path objects
+        return all_data[output_column_name]
+    else:
+        logger.info("Not writing results to disk.")
+        all_data_weights = np.ones_like(all_data[redshift_colname], dtype=float)
+        all_data_weights[data_selection] = weights_imlin
+        return weights_imlin
