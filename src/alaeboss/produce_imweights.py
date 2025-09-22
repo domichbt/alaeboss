@@ -46,6 +46,86 @@ def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nes
     )
 
 
+def columns_for_weight_scheme(
+    weight_scheme: str | None,
+    redshift_colname: str,
+    tracer: str,
+) -> tuple[set, set]:
+    """
+    Return the columns needed for the data and the randoms given the weight computation of `lklmini.produce_imweights.produce_imweights`, as a tuple of sets.
+
+    Parameters
+    ----------
+    weight_scheme : str or None
+        Weighting scheme used in the linear regression, see documentation of `lklmini.produce_imweights.produce_imweights`. If set to None, corresponds to the clustering catalog option.
+    redshift_colname : str
+        Name of the column containing redshift information ("Z" or "Z_not4clus").
+    tracer : str
+        Name of the tracer. Useful for the full catalog (columns needed in `goodz_infull`).
+
+    Returns
+    -------
+    tuple[set, set]
+        Two sets listing the required columns for the data and randoms respectively.
+
+    Raises
+    ------
+    KeyError
+        In the event of an unrecognized `weight_scheme` or `tracer`.
+    """
+    data_colnames = {
+        "RA",
+        "DEC",
+        "PHOTSYS",
+        redshift_colname,
+    }
+    randoms_colnames = {
+        "RA",
+        "DEC",
+        "PHOTSYS",
+    }
+
+    match tracer:
+        case "ELG":
+            data_colnames |= {"o2c"}
+        case "LRG" | "BGS":
+            data_colnames |= {"ZWARN", "DELTACHI2"}
+        case "QSO":
+            pass
+        case _:
+            raise KeyError("Unrecognized tracer %s", tracer)
+
+    match weight_scheme:
+        case None:  # clustering catalog
+            return (
+                data_colnames | {"WEIGHT", "WEIGHT_FKP", "WEIGHT_SYS", "WEIGHT_ZFAIL"},
+                randoms_colnames
+                | {
+                    "WEIGHT",
+                    "WEIGHT_FKP",
+                    "WEIGHT_SYS",
+                    "WEIGHT_ZFAIL",
+                    redshift_colname,
+                },
+            )
+        case "fracz":  # 1/FRACZ_TILELOCID based completeness weights
+            return (
+                data_colnames | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
+                randoms_colnames,
+            )
+        case "wt":  # whole weight column
+            return (data_colnames | {"WEIGHT"}, randoms_colnames | {"WEIGHT"})
+        case "wtfkp":  # whole weight column plus FKP
+            return (
+                data_colnames | {"WEIGHT", "WEIGHT_FKP"},
+                randoms_colnames | {"WEIGHT", "WEIGHT_FKP"},
+            )
+        case "wt_comp":  # WEIGHT_COMP
+            return (data_colnames | {"WEIGHT_COMP"}, randoms_colnames | {"WEIGHT_COMP"})
+        case _:
+            raise KeyError("Weight scheme %s is not recognized.", weight_scheme)
+
+
 def produce_imweights(
     # Input and output control
     data_catalog_paths: list[str],
@@ -153,6 +233,17 @@ def produce_imweights(
 
     time_start = time()
 
+    # define which columns will need to be loaded for the data and the randoms
+    data_colnames, random_colnames = columns_for_weight_scheme(
+        weight_scheme=weight_scheme,
+        redshift_colname=redshift_colname,
+        tracer=tracer_type[:3],
+    )
+    data_colnames = list(data_colnames)
+    random_colnames = list(random_colnames)
+    logger.debug("Columns to load for the data: %s", data_colnames)
+    logger.debug("Columns to load for the randoms: %s", random_colnames)
+
     debv = common.get_debv()  # for later
     sky_g, sky_r, sky_z = common.get_skyres()
     if output_directory is not None:
@@ -161,18 +252,18 @@ def produce_imweights(
     # read data catalogs
     logger.info("Reading data catalogs")
     all_data = Table(
-            np.concatenate(
-                [fitsio.read(data_catalog_path) for data_catalog_path in data_catalog_paths]
-            )
+        np.concatenate(
+            [
+                fitsio.read(data_catalog_path, columns=data_colnames)
+                for data_catalog_path in data_catalog_paths
+            ]
         )
-    logger.warning(len(all_data))
+    )
     # read randoms catalogs (note that since we are reading a subset of columns, this can take a lot on time from a job, no idea why)
     logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
     rands = np.concatenate(
         [
-            fitsio.read(
-                random_catalog_path,
-            )
+            fitsio.read(random_catalog_path, columns=random_colnames)
             for random_catalog_path in random_catalogs_paths
         ]
     )
