@@ -138,7 +138,9 @@ def produce_imweights(
     if is_clustering_catalog:
         logger.debug("The input catalogs are clustering catalogs...")
         if weight_scheme is not None:
-            raise ValueError("Cannot choose a weight scheme when using clustering catalogs ; `weight_scheme` should be set to `None`.")
+            raise ValueError(
+                "Cannot choose a weight scheme when using clustering catalogs ; `weight_scheme` should be set to `None`."
+            )
         redshift_colname = "Z"
     else:
         redshift_colname = "Z_not4clus"
