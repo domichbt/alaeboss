@@ -102,9 +102,9 @@ def produce_imweights(
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
             * `fracz`: 1/(`FRACZ_TILELOCID` * `FRAC_TLOBS_TILES`) for the data, 1 for the randoms.
             * `wt`: `WEIGHT` column from the catalog for the data and for the randoms
-            * `wtfkp`: FKP weights, *ie* `WEIGHT` * `WEIGHT_FKP` for both data and randoms. 
+            * `wtfkp`: FKP weights, *ie* `WEIGHT` * `WEIGHT_FKP` for both data and randoms.
             * `wt_comp`: `WEIGHT_COMP` column for the data, 1 for the randoms.
-            
+
         In all previous cases, if `WEIGHT_ZFAIL` is available, the weights will be multiplied by it. The standard for full catalogs is "fracz".
         If you are using **clustering** catalogs, *ie* if `is_clustering_catalog` is set to True, `weight_scheme` should be set to None as it will not be used.
     output_column_name : str or None, optional
@@ -279,13 +279,16 @@ def produce_imweights(
             # if using clustering catalogs, select randoms further
             if is_clustering_catalog:
                 logger.info("Clustering catalogs : selecting randoms")
-                selection_randoms = (region_randoms[redshift_colname] > z_range[0]) & (region_randoms[redshift_colname] < z_range[1])
+                selection_randoms = (region_randoms[redshift_colname] > z_range[0]) & (
+                    region_randoms[redshift_colname] < z_range[1]
+                )
                 selected_randoms = region_randoms[selection_randoms]
-                selected_randoms_templates_values = randoms_templates_values[:, selection_randoms]
+                selected_randoms_templates_values = randoms_templates_values[
+                    :, selection_randoms
+                ]
             else:
                 selected_randoms = region_randoms
                 selected_randoms_templates_values = randoms_templates_values
-
 
             # get data imaging systematics
             data_templates_values = read_systematic_templates_stacked_alt(
@@ -305,11 +308,25 @@ def produce_imweights(
             logger.info(f"Found columns {cols}")
 
             match weight_scheme:
-                case None: 
-                    assert is_clustering_catalog, "Cannot set weight_scheme to None if the catalogs are not clustering catalogs!"
-                    logger.info("Clustering catalogs: using WEIGHT * WEIGHT_FKP / WEIGHT_SYS")
-                    data_we *= selected_data["WEIGHT"] * selected_data["WEIGHT_FKP"] / selected_data["WEIGHT_SYS"] / selected_data["WEIGHT_ZFAIL"] # will be re-multiplied by WEIGHT_ZFAIL later
-                    rand_we *= selected_randoms["WEIGHT"] * selected_randoms["WEIGHT_FKP"] / selected_randoms["WEIGHT_SYS"] / selected_randoms["WEIGHT_ZFAIL"]
+                case None:
+                    assert is_clustering_catalog, (
+                        "Cannot set weight_scheme to None if the catalogs are not clustering catalogs!"
+                    )
+                    logger.info(
+                        "Clustering catalogs: using WEIGHT * WEIGHT_FKP / WEIGHT_SYS"
+                    )
+                    data_we *= (
+                        selected_data["WEIGHT"]
+                        * selected_data["WEIGHT_FKP"]
+                        / selected_data["WEIGHT_SYS"]
+                        / selected_data["WEIGHT_ZFAIL"]
+                    )  # will be re-multiplied by WEIGHT_ZFAIL later
+                    rand_we *= (
+                        selected_randoms["WEIGHT"]
+                        * selected_randoms["WEIGHT_FKP"]
+                        / selected_randoms["WEIGHT_SYS"]
+                        / selected_randoms["WEIGHT_ZFAIL"]
+                    )
                 case "fracz":
                     logger.info("Using 1/FRACZ_TILELOCID based completeness weights")
                     data_we /= selected_data["FRACZ_TILELOCID"]
@@ -325,7 +342,9 @@ def produce_imweights(
                 case "wtfkp":
                     logger.info("Using FKP weights and WEIGHT")
                     data_we *= selected_data["WEIGHT"] * selected_data["WEIGHT_FKP"]
-                    rand_we *= selected_randoms["WEIGHT"] * selected_randoms["WEIGHT_FKP"]
+                    rand_we *= (
+                        selected_randoms["WEIGHT"] * selected_randoms["WEIGHT_FKP"]
+                    )
                 case "wt_comp":
                     logger.info("Using WEIGHT_COMP column directly")
                     data_we *= selected_data["WEIGHT_COMP"]
@@ -338,8 +357,6 @@ def produce_imweights(
                 data_we *= selected_data["WEIGHT_ZFAIL"]
             else:
                 logger.info("No redshift failure weights")
-
-            
 
             logger.info("Starting regression...")
             regressor = LinearRegressor.from_stacked_templates(
@@ -377,7 +394,9 @@ def produce_imweights(
                     fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
                     fig.savefig(figname)
             else:
-                logger.info("`output_directory` set to None; not writing plots or parameters.")
+                logger.info(
+                    "`output_directory` set to None; not writing plots or parameters."
+                )
 
             weights_imlin[selection_data] = regressor.export_weights()
             t2 = time()
