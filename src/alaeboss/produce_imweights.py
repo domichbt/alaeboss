@@ -167,7 +167,6 @@ def produce_imweights(
         [
             fitsio.read(
                 random_catalog_path,
-                columns=["RA", "DEC", "PHOTSYS"],
             )
             for random_catalog_path in random_catalogs_paths
         ]
