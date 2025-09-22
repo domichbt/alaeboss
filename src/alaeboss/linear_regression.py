@@ -42,7 +42,7 @@ class LinearRegressor:
         loglevel: str = "INFO",
     ):
         """
-        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the `cut_outliers`, `prepare` and `regress` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the `weight_model` method on the `coefficients` attribute.
+        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
 
         :param data_weights: External, non-imaging weights for each object of the data catalog (FKP, completeness...)
         :type data_weights: ArrayLike
@@ -85,7 +85,7 @@ class LinearRegressor:
         use_float64 = jax.config.jax_enable_x64
         if not use_float64:
             self.logger.warning(
-                "`jax_enable_x64` is set to False; this means that computations will be capped to float32. The regression will most likely fail and at least return unexpected results. Are you sure you meant to do this? Otherwise use `jax.config.update('jax_enable_x64', True)"
+                "``jax_enable_x64`` is set to False; this means that computations will be capped to float32. The regression will most likely fail and at least return unexpected results. Are you sure you meant to do this? Otherwise use ``jax.config.update('jax_enable_x64', True)"
             )
 
         self.template_names = template_names
@@ -148,7 +148,7 @@ class LinearRegressor:
         loglevel: str = "INFO",
     ) -> Self:
         """
-        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the `cut_outliers`, `prepare` and `regress` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the `weight_model` method on the `coefficients` attribute.
+        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
 
         :param data_weights: External, non-imaging weights for each object of the data catalog (FKP, completeness...)
         :type data_weights: ArrayLike
@@ -158,11 +158,11 @@ class LinearRegressor:
         :type template_values_data: ArrayLike
         :param template_values_randoms: Array containing the template values for the randoms, for each template (shape = (# of templates, length of randoms))
         :type template_values_randoms: ArrayLike
-        :param template_names: List of the names of the templates, in the same order as in `template_values_data` and  `template_values_randoms`
+        :param template_names: List of the names of the templates, in the same order as in ``template_values_data`` and  ``template_values_randoms``
         :type template_names: list[str]
         :param loglevel: Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG
         :type loglevel: str
-        :return: LinearRegressor instance, as would have been initialized with templates written in dictionaries (default `__init__`).
+        :return: LinearRegressor instance, as would have been initialized with templates written in dictionaries (default ``__init__``).
         :rtype: LinearRegressor
         """
         reg = cls.__new__(
@@ -186,7 +186,7 @@ class LinearRegressor:
 
     def save(self, filepath: str):
         """
-        Save the current instance data to disk. No regression or bin related information is saved. After loading, do not repeat cut_outliers as they are already removed.
+        Save the current instance data to disk. No regression or bin related information is saved. After loading, do not repeat ``cut_outliers`` as they are already removed.
 
         :param filepath: Path to the file where data should be saved.
         :type filepath: str
@@ -224,7 +224,7 @@ class LinearRegressor:
 
     def cut_outliers(self, tail: float = 0.5):
         """
-        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, `tail`% of the values are removed for each template.
+        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, ``tail``% of the values are removed for each template.
 
         :param tail: Percentage of the extremal values to remove for each template.
         :type tail: float
@@ -360,7 +360,7 @@ class LinearRegressor:
 
     def weight_model(self, coefficients: ArrayLike):
         """
-        Return the weights computed from the model for the data. The returned array has the same shape as ``.
+        Return the weights computed from the model for the data. The returned array has the same shape as the good values of the data.
 
         :param coefficients: Parameters of the regression to weight each template, as well as the constant offset at index 0.
         :type coefficients: ArrayLike
@@ -401,7 +401,7 @@ class LinearRegressor:
 
     def regress(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
         """
-        Find optimal coefficients by minimizing the cost function. Can provide an initial guess `guess`, otherwise all ones will be used.
+        Find optimal coefficients by minimizing the cost function. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
         :param guess: Initial guess for the regression coefficients, of shape (1 + number of templates).
         :type guess: ArrayLike | None
@@ -427,7 +427,7 @@ class LinearRegressor:
 
     def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
         """
-        Find optimal coefficients by minimizing the cost function using iminuit. Can provide an initial guess `guess`, otherwise all ones will be used.
+        Find optimal coefficients by minimizing the cost function using iminuit. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
         :param guess: Initial guess for the regression coefficients, of shape (1 + number of templates).
         :type guess: ArrayLike | None
@@ -485,13 +485,13 @@ class LinearRegressor:
         else:
             return self.good_values_data
 
-    # Additional methods to match original `Syst` class
+    # Additional methods to match original ``Syst`` class
     def get_subsample(self, subdata_mask: ArrayLike):
         """
         Docstring for get_subsample
 
         :param self: Instance to copy
-        :param subdata_mask: Mask to apply on the data and templates. Note that these should have had bad values and outliers cut out, so the shape may be different from initial data fed to the initializer. Correspondance between original and current shape can be obtained from `LinearRegressor.mask()`.
+        :param subdata_mask: Mask to apply on the data and templates. Note that these should have had bad values and outliers cut out, so the shape may be different from initial data fed to the initializer. Correspondance between original and current shape can be obtained from ``LinearRegressor.mask()``.
         :type subdata_mask: ArrayLike
         """
         data_weights = self.data[subdata_mask]
@@ -571,7 +571,7 @@ class LinearRegressor:
                 / self.randoms_binned[index],
                 self.error[index],
                 fmt=".",
-                label=f"χ² = {partial_chi2_noweights:.2f}/{self.nbins} = {partial_chi2_noweights/self.nbins:.2f}",
+                label=f"χ² = {partial_chi2_noweights:.2f}/{self.nbins} = {partial_chi2_noweights / self.nbins:.2f}",
             )
 
             partial_chi2 = (chi2_arr[index]).sum()
@@ -580,7 +580,7 @@ class LinearRegressor:
                 self.normalization * data_binned[index] / self.randoms_binned[index],
                 self.error[index],
                 fmt=".",
-                label=f"χ² = {partial_chi2:.2f}/{self.nbins} = {partial_chi2/self.nbins:.2f}",
+                label=f"χ² = {partial_chi2:.2f}/{self.nbins} = {partial_chi2 / self.nbins:.2f}",
             )
 
             hist_data_syst, bins = jnp.histogram(

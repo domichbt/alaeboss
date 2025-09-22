@@ -1,19 +1,21 @@
 """
-Utility function to regress imaging systematic weights on DESI data as is done in `mkCat_main.py` using methods in linear_regression.py.
+Utility function to regress imaging systematic weights on DESI data as is done in ``mkCat_main.py`` using methods in linear_regression.py.
 
-Correspondence between arguments and variables in `mkCat_main.py`:
+Correspondence between arguments and variables in ``mkCat_main.py``:
 
-* `templates_maps_path_N = f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_N.fits"`
-* `templates_maps_path_S = f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_S.fits"`
-* `redshift_range = zrl`
-* `tracer_type = type`
-* `output_directory = dirout`
-* `fit_maps`: the maps you want to regress against. Might be usemaps if not None, otherwise `mainp.fit_maps_allebv` (LRGs) or `mainp.fit_maps`
-* `output_directory = dirout`
+* ``templates_maps_path_N = f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_N.fits"``
+* ``templates_maps_path_S = f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_S.fits"``
+* ``redshift_range = zrl``
+* ``tracer_type = type``
+* ``output_directory = dirout``
+* ``fit_maps``: the maps you want to regress against. Might be usemaps if not None, otherwise ``mainp.fit_maps_allebv`` (LRGs) or ``mainp.fit_maps``
+* ``output_directory = dirout``
 
 You can setup a basic logger to pass to the function as
-```
-logger = logging.getLogger(__name__)
+
+.. code-block:: python
+
+    logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
     stream_handler = logging.StreamHandler()
     formatter = logging.Formatter(
@@ -21,7 +23,6 @@ logger = logging.getLogger(__name__)
     )
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
-```
 """
 
 import logging
@@ -52,16 +53,16 @@ def columns_for_weight_scheme(
     tracer: str,
 ) -> tuple[set, set]:
     """
-    Return the columns needed for the data and the randoms given the weight computation of `lklmini.produce_imweights.produce_imweights`, as a tuple of sets.
+    Return the columns needed for the data and the randoms given the weight computation of ``lklmini.produce_imweights.produce_imweights``, as a tuple of sets.
 
     Parameters
     ----------
     weight_scheme : str or None
-        Weighting scheme used in the linear regression, see documentation of `lklmini.produce_imweights.produce_imweights`. If set to None, corresponds to the clustering catalog option.
+        Weighting scheme used in the linear regression, see documentation of ``lklmini.produce_imweights.produce_imweights``. If set to None, corresponds to the clustering catalog option.
     redshift_colname : str
         Name of the column containing redshift information ("Z" or "Z_not4clus").
     tracer : str
-        Name of the tracer. Useful for the full catalog (columns needed in `goodz_infull`).
+        Name of the tracer. Useful for the full catalog (columns needed in ``goodz_infull``).
 
     Returns
     -------
@@ -71,7 +72,7 @@ def columns_for_weight_scheme(
     Raises
     ------
     KeyError
-        In the event of an unrecognized `weight_scheme` or `tracer`.
+        In the event of an unrecognized ``weight_scheme`` or ``tracer``.
     """
     data_colnames = {
         "RA",
@@ -180,13 +181,13 @@ def produce_imweights(
         Path to the catalog where the output weights should be written. If None, no output is written.
     weight_scheme : str
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
-            * `fracz`: 1/(`FRACZ_TILELOCID` * `FRAC_TLOBS_TILES`) for the data, 1 for the randoms.
-            * `wt`: `WEIGHT` column from the catalog for the data and for the randoms
-            * `wtfkp`: FKP weights, *ie* `WEIGHT` * `WEIGHT_FKP` for both data and randoms.
-            * `wt_comp`: `WEIGHT_COMP` column for the data, 1 for the randoms.
+            * ``fracz``: 1/(``FRACZ_TILELOCID`` * ``FRAC_TLOBS_TILES``) for the data, 1 for the randoms.
+            * ``wt``: ``WEIGHT`` column from the catalog for the data and for the randoms
+            * ``wtfkp``: FKP weights, *ie* ``WEIGHT`` * ``WEIGHT_FKP`` for both data and randoms.
+            * ``wt_comp``: ``WEIGHT_COMP`` column for the data, 1 for the randoms.
 
-        In all previous cases, if `WEIGHT_ZFAIL` is available, the weights will be multiplied by it. The standard for full catalogs is "fracz".
-        If you are using **clustering** catalogs, *ie* if `is_clustering_catalog` is set to True, `weight_scheme` should be set to None as it will not be used.
+        In all previous cases, if ``WEIGHT_ZFAIL`` is available, the weights will be multiplied by it. The standard for full catalogs is "fracz".
+        If you are using **clustering** catalogs, *ie* if ``is_clustering_catalog`` is set to True, ``weight_scheme`` should be set to None as it will not be used.
     output_column_name : str or None, optional
         Name of the output column to store computed weights in the data catalog (default is "WEIGHT_IMLIN"). If set to None, the original catalog will be left untouched.
     save_summary_plots : bool, optional
@@ -198,7 +199,7 @@ def produce_imweights(
     logger : logging.Logger, optional
         Logger object for logging progress and information (default is None). This will not log anything if set to None.
     loglevel : str, optional
-        Logging level for the regressor's logger (default is "INFO"). Will not affect `logger`'s level.
+        Logging level for the regressor's logger (default is "INFO"). Will not affect ``logger``'s level.
     Returns
     -------
     numpy.ndarray
