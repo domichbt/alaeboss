@@ -1,3 +1,5 @@
+"""Test of the linear regression using basic synthetic data."""
+
 import jax
 import jax.numpy as jnp
 import jax.random as jrd
