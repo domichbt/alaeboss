@@ -39,7 +39,7 @@ import healpy as hp
 from alaeboss.linear_regression import LinearRegressor
 
 
-def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nest):
+def _read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nest):
     pixnums = hp.ang2pix(nside, np.radians(-dec + 90), np.radians(ra), nest=nest)
     systematics_values = sys_tab[use_maps][pixnums]
     return np.vstack(
@@ -347,7 +347,7 @@ def produce_imweights(
         region_randoms = rands[region_mask_randoms]
         # rand_syst = densvar.read_systematic_maps_alt(region_randoms['RA'], region_randoms['DEC'], sys_tab, use_maps)
         logger.info("Reading template values for the randoms")
-        randoms_templates_values = read_systematic_templates_stacked_alt(
+        randoms_templates_values = _read_systematic_templates_stacked_alt(
             ra=region_randoms["RA"],
             dec=region_randoms["DEC"],
             sys_tab=sys_tab,
@@ -388,7 +388,7 @@ def produce_imweights(
                 selected_randoms_templates_values = randoms_templates_values
 
             # get data imaging systematics
-            data_templates_values = read_systematic_templates_stacked_alt(
+            data_templates_values = _read_systematic_templates_stacked_alt(
                 ra=selected_data["RA"],
                 dec=selected_data["DEC"],
                 sys_tab=sys_tab,
