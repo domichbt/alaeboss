@@ -22,6 +22,8 @@ def my_bincount(idx, accumutalor, weights):
 
 
 class LinearRegressor:
+    """Object that contains the data and randoms information, and can perform à la eBOSS linear regression as well as export weights."""
+
     constant = "constant"  # Name of the constant contribution in the weights
     bin_margin = (
         1e-7  # Extra space at the beginning and end of edges to avoid null-sized bins
