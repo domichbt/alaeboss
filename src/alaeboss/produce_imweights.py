@@ -153,6 +153,7 @@ def produce_imweights(
 ):
     """
     Perform linear regression to compute imaging systematics weights for a given tracer type, data catalog, random catalogs, set of maps.
+
     This function reads in a data catalog and associated random catalogs, applies selection criteria, loads imaging systematics templates, and performs regression to estimate and assign imaging weights to the data. The regression is performed separately for different photometric regions and redshift bins. Optionally, summary plots can be saved.
 
     Parameters
@@ -200,12 +201,14 @@ def produce_imweights(
         Logger object for logging progress and information (default is None). This will not log anything if set to None.
     loglevel : str, optional
         Logging level for the regressor's logger (default is "INFO"). Will not affect ``logger``'s level.
+
     Returns
     -------
     numpy.ndarray
         The function modifies the input data catalog in place by adding or updating the output_column_name
         with computed imaging weights, and writes regression parameters and plots to the output directory.
         The computed imaging weights are returned as an array (same shape as the input data, set to 1.0 where weights weren't computed.)
+
     Notes
     -----
     Loading some columns only from FITS file during NERSC jobs can be very long for mysterious reasons. If you are experiencing huge catalog readtimes, this might be why.
