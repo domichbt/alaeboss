@@ -1,3 +1,5 @@
+"""Linear regression on the histograms of the systematics maps, reproducing the "linear" method of recent DESI and eBOSS catalogs."""
+
 try:
     from typing import Self
 except ImportError:
