@@ -17,7 +17,7 @@ from jax.typing import ArrayLike
 
 
 @jax.jit
-def my_bincount(idx, accumutalor, weights):
+def _my_bincount(idx, accumutalor, weights):
     return accumutalor.at[idx].add(weights)[1:-1]
 
 
@@ -313,7 +313,7 @@ class LinearRegressor:
         # jax.lax.map because the randoms array can get too big for JAX jax.vmap implementation otherwise
         self.randoms_binned = jax.lax.map(
             f=partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.randoms,
             ),
@@ -332,7 +332,7 @@ class LinearRegressor:
         self.logger.debug("Digitized data")
         self.data_binned_noweights = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data,
             )
@@ -388,7 +388,7 @@ class LinearRegressor:
         """
         data_binned = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data * self.weight_model(coefficients),
             )
@@ -554,7 +554,7 @@ class LinearRegressor:
         centers = (self.edges[:, :-1] + self.edges[:, 1:]) / 2
         data_binned = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data * self.weight_model(coefficients),
             )
