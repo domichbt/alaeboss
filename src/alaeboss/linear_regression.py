@@ -24,12 +24,13 @@ def _my_bincount(idx, accumutalor, weights):
 class LinearRegressor:
     """Object that contains the data and randoms information, and can perform à la eBOSS linear regression as well as export weights."""
 
-    constant = "constant"  # Name of the constant contribution in the weights
-    bin_margin = (
-        1e-7  # Extra space at the beginning and end of edges to avoid null-sized bins
-    )
+    constant: str = "constant"
+    """Name of the constant contribution in the density model."""
+    bin_margin: float = 1e-7
+    """Extra space at the beginning and end of edges to avoid null-sized bins"""
 
     logger = logging.getLogger(__qualname__)
+    """Logger object for the class."""
     logger.setLevel(logging.DEBUG)
     _stream_handler = logging.StreamHandler()
     _formatter = logging.Formatter(
