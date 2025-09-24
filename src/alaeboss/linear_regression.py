@@ -1,3 +1,5 @@
+"""Linear regression on the histograms of the systematics maps, reproducing the "linear" method of recent DESI and eBOSS catalogs."""
+
 try:
     from typing import Self
 except ImportError:
@@ -15,43 +17,50 @@ from jax.typing import ArrayLike
 
 
 @jax.jit
-def my_bincount(idx, accumutalor, weights):
+def _my_bincount(idx, accumutalor, weights):
     return accumutalor.at[idx].add(weights)[1:-1]
 
 
 class LinearRegressor:
-    constant = "constant"  # Name of the constant contribution in the weights
-    bin_margin = (
-        1e-7  # Extra space at the beginning and end of edges to avoid null-sized bins
-    )
+    """Object that contains the data and randoms information, and can perform à la eBOSS linear regression as well as export weights."""
+
+    constant: str = "constant"
+    """Name of the constant contribution in the density model."""
+    bin_margin: float = 1e-7
+    """Extra space at the beginning and end of edges to avoid null-sized bins"""
 
     logger = logging.getLogger(__qualname__)
+    """Logger object for the class."""
     logger.setLevel(logging.DEBUG)
-    stream_handler = logging.StreamHandler()
-    formatter = logging.Formatter(
+    _stream_handler = logging.StreamHandler()
+    _formatter = logging.Formatter(
         "%(asctime)s [%(name)s] %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S"
     )
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    _stream_handler.setFormatter(_formatter)
+    logger.addHandler(_stream_handler)
 
     def __init__(
         self,
         data_weights: ArrayLike,
         random_weights: ArrayLike,
-        templates: dict[str : (jnp.array, jnp.array)],
+        templates: dict[str, tuple[ArrayLike, ArrayLike]],
         loglevel: str = "INFO",
     ):
         """
-        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
+        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties.
 
-        :param data_weights: External, non-imaging weights for each object of the data catalog (FKP, completeness...)
-        :type data_weights: ArrayLike
-        :param random_weights: External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
-        :type random_weights: ArrayLike
-        :param templates: Dictionnary containing the imaging template values for each objects of the data and randoms catalogs, under the form of {template_name: (data_values, random_values)}
-        :type templates: dict[str: (jnp.array, jnp.array)]
-        :param loglevel: Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG.
-        :type loglevel: str
+        The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
+
+        Parameters
+        ----------
+        data_weights : ArrayLike
+            External, non-imaging weights for each object of the data catalog (FKP, completeness...)
+        random_weights : ArrayLike
+            External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
+        templates : dict[str, tuple[ArrayLike, ArrayLike]]
+            Dictionnary containing the imaging template values for each objects of the data and randoms catalogs, under the form of {template_name: (data_values, random_values)}
+        loglevel : str
+            Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG.
         """
         # Build the systematics matrices
         template_values_data = jnp.vstack(
@@ -148,22 +157,29 @@ class LinearRegressor:
         loglevel: str = "INFO",
     ) -> Self:
         """
-        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties. The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
+        Initialize a LinearRegressor instance for imaging systematics, by giving information on the data and randoms' properties.
 
-        :param data_weights: External, non-imaging weights for each object of the data catalog (FKP, completeness...)
-        :type data_weights: ArrayLike
-        :param random_weights: External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
-        :type random_weights: ArrayLike
-        :param template_values_data: Array containing the template values for the data, for each template (shape = (# of templates, length of data))
-        :type template_values_data: ArrayLike
-        :param template_values_randoms: Array containing the template values for the randoms, for each template (shape = (# of templates, length of randoms))
-        :type template_values_randoms: ArrayLike
-        :param template_names: List of the names of the templates, in the same order as in ``template_values_data`` and  ``template_values_randoms``
-        :type template_names: list[str]
-        :param loglevel: Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG
-        :type loglevel: str
-        :return: LinearRegressor instance, as would have been initialized with templates written in dictionaries (default ``__init__``).
-        :rtype: LinearRegressor
+        The regression can then be run by calling the ``cut_outliers``, ``prepare`` and ``regress`` methods in that order. Once the regression has succeeded, weights can then be obtained by calling the ``weight_model`` method on the ``coefficients`` attribute.
+
+        Parameters
+        ----------
+        data_weights : ArrayLike
+            External, non-imaging weights for each object of the data catalog (FKP, completeness...)
+        random_weights : ArrayLike
+            External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
+        template_values_data : ArrayLike
+            Array containing the template values for the data, for each template (shape = (# of templates, length of data))
+        template_values_randoms : ArrayLike
+            Array containing the template values for the randoms, for each template (shape = (# of templates, length of randoms))
+        template_names : list[str]
+            List of the names of the templates, in the same order as in ``template_values_data`` and  ``template_values_randoms``
+        loglevel : str
+            Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG
+
+        Returns
+        -------
+        LinearRegressor
+            LinearRegressor instance, as would have been initialized with templates written in dictionaries (default ``__init__``).
         """
         reg = cls.__new__(
             cls,
@@ -188,8 +204,8 @@ class LinearRegressor:
         """
         Save the current instance data to disk. No regression or bin related information is saved. After loading, do not repeat ``cut_outliers`` as they are already removed.
 
-        :param filepath: Path to the file where data should be saved.
-        :type filepath: str
+        filepath : str
+            Path to the file where data should be saved.
         """
         np.savez(
             file=filepath,
@@ -206,11 +222,17 @@ class LinearRegressor:
         """
         Create a Linear regressor instance from disk.
 
-        :param cls: Description
-        :param filepath: Description
-        :type filepath: str
-        :param loglevel: Description
-        :type loglevel: str
+        Parameters
+        ----------
+        filepath : str
+            Path from which to load the file.
+        loglevel : str, optional
+            Logging level for the new ``LinearRegressor`` instance, by default "INFO".
+
+        Returns
+        -------
+        Self
+            ``LinearRegressor`` instance loaded from disk.
         """
         from_disk = jnp.load(filepath)
         return cls.from_stacked_templates(
@@ -223,12 +245,13 @@ class LinearRegressor:
         )
 
     def cut_outliers(self, tail: float = 0.5):
-        """
-        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, ``tail``% of the values are removed for each template.
+        r"""
+        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, ``tail``\% of the values are removed for each template.
 
-        :param tail: Percentage of the extremal values to remove for each template.
-        :type tail: float
-
+        Parameters
+        ----------
+        tail : float
+            Percentage of the extremal values to remove for each template.
         """
         lower_tail = jnp.percentile(self.template_values_data, tail / 2, axis=1)
         upper_tail = jnp.percentile(self.template_values_data, 100 - tail / 2, axis=1)
@@ -272,6 +295,11 @@ class LinearRegressor:
     def prepare(self, nbins: int):
         """
         Define bins for the systematics values and setup the corresponding random's binned counts.
+
+        Parameters
+        ----------
+        nbins : int
+            Number of bins for the imaging systematics values.
         """
         self.logger.info("Setting up %i bins", nbins)
         self.nbins = nbins
@@ -309,7 +337,7 @@ class LinearRegressor:
         # jax.lax.map because the randoms array can get too big for JAX jax.vmap implementation otherwise
         self.randoms_binned = jax.lax.map(
             f=partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.randoms,
             ),
@@ -328,7 +356,7 @@ class LinearRegressor:
         self.logger.debug("Digitized data")
         self.data_binned_noweights = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data,
             )
@@ -362,9 +390,10 @@ class LinearRegressor:
         """
         Return the weights computed from the model for the data. The returned array has the same shape as the good values of the data.
 
-        :param coefficients: Parameters of the regression to weight each template, as well as the constant offset at index 0.
-        :type coefficients: ArrayLike
-
+        Parameters
+        ----------
+        coefficients : ArrayLike
+            Parameters of the regression to weight each template, as well as the constant offset at index 0.
         """
         return 1 / (
             1
@@ -372,19 +401,26 @@ class LinearRegressor:
             + jnp.dot(coefficients[1:], self.template_values_data_normalized)
         )
 
-    def chi2(self, coefficients: ArrayLike):
+    def chi2(self, coefficients: ArrayLike) -> float:
         """
         Return the total cost function, defined for each template as the square of the ratio (weighted data histogram) to (weighted random histogram) minus one.
+
         Coefficients are used for the weight computation for the data.
         Use Poisson error of the ratio of weighted data (using coefficients) and weighted randoms.
 
-        :param coefficients: Parameters of the regression to weight each template, as well as the constant offset at index 0.
-        :type coefficients: ArrayLike
+        Parameters
+        ----------
+        coefficients : ArrayLike
+            Parameters of the regression to weight each template, as well as the constant offset at index 0.
 
+        Returns
+        -------
+        float
+            chisquare value for the given coefficients.
         """
         data_binned = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data * self.weight_model(coefficients),
             )
@@ -399,14 +435,19 @@ class LinearRegressor:
             )
         )
 
-    def regress(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
+    def regress(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
         Find optimal coefficients by minimizing the cost function. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
-        :param guess: Initial guess for the regression coefficients, of shape (1 + number of templates).
-        :type guess: ArrayLike | None
-        :return: Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, None is returned.
-        :rtype: dict | None
+        Parameters
+        ----------
+        guess : ArrayLike | None
+            Initial guess for the regression coefficients, of shape (1 + number of templates). Default is ``None``.
+
+        Returns
+        -------
+        dict[str, float] | None
+            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, ``None`` is returned.
         """
         if guess is None:
             guess = jnp.ones(shape=(len(self.template_names) + 1), dtype=float)
@@ -425,14 +466,19 @@ class LinearRegressor:
             self.coefficients = res.x
             return dict(zip([self.constant] + self.template_names, res.x))
 
-    def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
+    def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
         Find optimal coefficients by minimizing the cost function using iminuit. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
-        :param guess: Initial guess for the regression coefficients, of shape (1 + number of templates).
-        :type guess: ArrayLike | None
-        :return: Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, None is returned.
-        :rtype: dict | None
+        Parameters
+        ----------
+        guess : ArrayLike | None
+            Initial guess for the regression coefficients, of shape (1 + number of templates). Default is ``None``.
+
+        Returns
+        -------
+        dict[str, float] | None
+            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, ``None`` is returned.
         """
         from iminuit import Minuit
 
@@ -460,9 +506,13 @@ class LinearRegressor:
             self.coefficients = jnp.array(m.values)
             return dict(zip([self.constant] + self.template_names, list(m.values)))
 
-    def export_weights(self):
+    def export_weights(self) -> ArrayLike:
         """
-        Return the imaging systematics weights using the parameters computed from the regression. The weights are also computed for data with extremal values of the systematics that were ignored in the regression.
+        Return the imaging systematics weights using the parameters computed from the regression.
+
+        Notes
+        -----
+        The weights are also computed for data with extremal values of the systematics that were ignored in the regression.
         """
         assert (~jnp.isnan(self.coefficients)).any()
         _template_values_data_for_export_normalized = (
@@ -477,7 +527,15 @@ class LinearRegressor:
             )
         )
 
-    def mask(self):
+    def mask(self) -> ArrayLike:
+        """
+        Return a boolean mask linking the original data catalog to the internal one (good and non-extremal values only).
+
+        Returns
+        -------
+        ArrayLike
+            Boolean mask with 0 for bad data or extremal systematics values and 1 for the rest.
+        """
         if hasattr(self, "extremal_data_mask"):
             return self.good_values_data.at[self.good_values_data].set(
                 self.extremal_data_mask
@@ -486,13 +544,14 @@ class LinearRegressor:
             return self.good_values_data
 
     # Additional methods to match original ``Syst`` class
-    def get_subsample(self, subdata_mask: ArrayLike):
+    def get_subsample(self, subdata_mask: ArrayLike) -> Self:
         """
-        Docstring for get_subsample
+        Create a new LinearRegressor instance from a subsample of the data.
 
-        :param self: Instance to copy
-        :param subdata_mask: Mask to apply on the data and templates. Note that these should have had bad values and outliers cut out, so the shape may be different from initial data fed to the initializer. Correspondance between original and current shape can be obtained from ``LinearRegressor.mask()``.
-        :type subdata_mask: ArrayLike
+        Parameters
+        ----------
+        subdata_mask : ArrayLike
+            Mask to apply on the data and templates. Note that these should have had bad values and outliers cut out, so the shape may be different from initial data fed to the initializer. Correspondance between original and current shape can be obtained from ``LinearRegressor.mask()``.
         """
         data_weights = self.data[subdata_mask]
         random_weights = self.randoms
@@ -518,21 +577,23 @@ class LinearRegressor:
     def plot_overdensity(
         self,
         coefficients: ArrayLike | None = None,
-        ylim: list[float, float] = [0.75, 1.25],
+        ylim: tuple[float, float] = [0.75, 1.25],
         nbinsh: int = 50,
         title: str = None,
     ):
         """
         Create a subplot for each template, and plot the normalized histogram values before and after the regression. The initial distribution of the template on the data is overlaid on the bottom of the plot.
 
-        :param coefficients: parameters for the weight model; if None, will default to the regression result.
-        :type coefficients: ArrayLike | None
-        :param ylim: Limits for the y-axis
-        :type ylim: list[float, float]
-        :param nbinsh: Number of bins for the overlaid histograms
-        :type nbinsh: int
-        :param title: Optional title
-        :type title: str
+        Parameters
+        ----------
+        coefficients : ArrayLike | None
+            parameters for the weight model; if None, will default to the regression result.
+        ylim : tuple[float, float]
+            Limits for the y-axis
+        nbinsh : int
+            Number of bins for the overlaid histograms
+        title : str
+            Optional title
         """
         fig, axes = plt.subplots(
             1,
@@ -550,7 +611,7 @@ class LinearRegressor:
         centers = (self.edges[:, :-1] + self.edges[:, 1:]) / 2
         data_binned = jax.vmap(
             partial(
-                my_bincount,
+                _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
                 weights=self.data * self.weight_model(coefficients),
             )

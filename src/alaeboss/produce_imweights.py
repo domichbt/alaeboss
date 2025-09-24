@@ -39,7 +39,7 @@ import healpy as hp
 from alaeboss.linear_regression import LinearRegressor
 
 
-def read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nest):
+def _read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, nest):
     pixnums = hp.ang2pix(nside, np.radians(-dec + 90), np.radians(ra), nest=nest)
     systematics_values = sys_tab[use_maps][pixnums]
     return np.vstack(
@@ -153,6 +153,7 @@ def produce_imweights(
 ):
     """
     Perform linear regression to compute imaging systematics weights for a given tracer type, data catalog, random catalogs, set of maps.
+
     This function reads in a data catalog and associated random catalogs, applies selection criteria, loads imaging systematics templates, and performs regression to estimate and assign imaging weights to the data. The regression is performed separately for different photometric regions and redshift bins. Optionally, summary plots can be saved.
 
     Parameters
@@ -200,12 +201,14 @@ def produce_imweights(
         Logger object for logging progress and information (default is None). This will not log anything if set to None.
     loglevel : str, optional
         Logging level for the regressor's logger (default is "INFO"). Will not affect ``logger``'s level.
+
     Returns
     -------
     numpy.ndarray
         The function modifies the input data catalog in place by adding or updating the output_column_name
         with computed imaging weights, and writes regression parameters and plots to the output directory.
         The computed imaging weights are returned as an array (same shape as the input data, set to 1.0 where weights weren't computed.)
+
     Notes
     -----
     Loading some columns only from FITS file during NERSC jobs can be very long for mysterious reasons. If you are experiencing huge catalog readtimes, this might be why.
@@ -347,7 +350,7 @@ def produce_imweights(
         region_randoms = rands[region_mask_randoms]
         # rand_syst = densvar.read_systematic_maps_alt(region_randoms['RA'], region_randoms['DEC'], sys_tab, use_maps)
         logger.info("Reading template values for the randoms")
-        randoms_templates_values = read_systematic_templates_stacked_alt(
+        randoms_templates_values = _read_systematic_templates_stacked_alt(
             ra=region_randoms["RA"],
             dec=region_randoms["DEC"],
             sys_tab=sys_tab,
@@ -388,7 +391,7 @@ def produce_imweights(
                 selected_randoms_templates_values = randoms_templates_values
 
             # get data imaging systematics
-            data_templates_values = read_systematic_templates_stacked_alt(
+            data_templates_values = _read_systematic_templates_stacked_alt(
                 ra=selected_data["RA"],
                 dec=selected_data["DEC"],
                 sys_tab=sys_tab,
