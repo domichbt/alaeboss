@@ -10,7 +10,19 @@ Use "à la eBOSS" linear regression on data and randoms catalogs to correct for 
 
 The code is designed to mimic the original eBOSS method but is implemented more efficiently. In particular, it makes use of JAX to accelerate the minimization process, and pre-made scripts such as :py:func:`~alaeboss.produce_imweights` take care to minimize the amount of I/O.
 
+
+Installation
+------------
+
+To use alaeboss, first install it using pip:
+
+.. code-block:: console
+
+   (.venv) $ pip install git+https://github.com/domichbt/alaeboss.git
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
+.. toctree::
+   modules
