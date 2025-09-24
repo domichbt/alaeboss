@@ -31,12 +31,12 @@ class LinearRegressor:
 
     logger = logging.getLogger(__qualname__)
     logger.setLevel(logging.DEBUG)
-    stream_handler = logging.StreamHandler()
-    formatter = logging.Formatter(
+    _stream_handler = logging.StreamHandler()
+    _formatter = logging.Formatter(
         "%(asctime)s [%(name)s] %(levelname)s | %(message)s", "%Y-%m-%d %H:%M:%S"
     )
-    stream_handler.setFormatter(formatter)
-    logger.addHandler(stream_handler)
+    _stream_handler.setFormatter(_formatter)
+    logger.addHandler(_stream_handler)
 
     def __init__(
         self,
