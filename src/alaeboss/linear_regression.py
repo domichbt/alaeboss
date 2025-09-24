@@ -238,8 +238,8 @@ class LinearRegressor:
         )
 
     def cut_outliers(self, tail: float = 0.5):
-        """
-        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, ``tail``% of the values are removed for each template.
+        r"""
+        For each template, remove the data and random that possess values in the extremal tails of the distribution. In total, ``tail``\% of the values are removed for each template.
 
         Parameters
         ----------
