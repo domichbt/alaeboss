@@ -43,7 +43,7 @@ class LinearRegressor:
         self,
         data_weights: ArrayLike,
         random_weights: ArrayLike,
-        templates: dict[str : (ArrayLike, ArrayLike)],
+        templates: dict[str, tuple[ArrayLike, ArrayLike]],
         loglevel: str = "INFO",
     ):
         """
@@ -57,7 +57,7 @@ class LinearRegressor:
             External, non-imaging weights for each object of the data catalog (FKP, completeness...)
         random_weights : ArrayLike
             External, non-imaging weights for each object of the randoms catalog (FKP, completeness...)
-        templates : dict[str: (ArrayLike, ArrayLike)]
+        templates : dict[str, tuple[ArrayLike, ArrayLike]]
             Dictionnary containing the imaging template values for each objects of the data and randoms catalogs, under the form of {template_name: (data_values, random_values)}
         loglevel : str
             Minimal logging level, set by default to INFO. Additional output can be obtained from DEBUG.
@@ -204,8 +204,8 @@ class LinearRegressor:
         """
         Save the current instance data to disk. No regression or bin related information is saved. After loading, do not repeat ``cut_outliers`` as they are already removed.
 
-        :param filepath: Path to the file where data should be saved.
-        :type filepath: str
+        filepath : str
+            Path to the file where data should be saved.
         """
         np.savez(
             file=filepath,
@@ -222,11 +222,17 @@ class LinearRegressor:
         """
         Create a Linear regressor instance from disk.
 
-        :param cls: Description
-        :param filepath: Description
-        :type filepath: str
-        :param loglevel: Description
-        :type loglevel: str
+        Parameters
+        ----------
+        filepath : str
+            Path from which to load the file.
+        loglevel : str, optional
+            Logging level for the new ``LinearRegressor`` instance, by default "INFO".
+
+        Returns
+        -------
+        Self
+            ``LinearRegressor`` instance loaded from disk.
         """
         from_disk = jnp.load(filepath)
         return cls.from_stacked_templates(
@@ -429,19 +435,19 @@ class LinearRegressor:
             )
         )
 
-    def regress(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
+    def regress(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
         Find optimal coefficients by minimizing the cost function. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
         Parameters
         ----------
         guess : ArrayLike | None
-            Initial guess for the regression coefficients, of shape (1 + number of templates).
+            Initial guess for the regression coefficients, of shape (1 + number of templates). Default is ``None``.
 
         Returns
         -------
-        dict | None
-            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, None is returned.
+        dict[str, float] | None
+            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, ``None`` is returned.
         """
         if guess is None:
             guess = jnp.ones(shape=(len(self.template_names) + 1), dtype=float)
@@ -460,19 +466,19 @@ class LinearRegressor:
             self.coefficients = res.x
             return dict(zip([self.constant] + self.template_names, res.x))
 
-    def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str:float] | None:
+    def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
         Find optimal coefficients by minimizing the cost function using iminuit. Can provide an initial guess ``guess``, otherwise all ones will be used.
 
         Parameters
         ----------
         guess : ArrayLike | None
-            Initial guess for the regression coefficients, of shape (1 + number of templates).
+            Initial guess for the regression coefficients, of shape (1 + number of templates). Default is ``None``.
 
         Returns
         -------
-        dict | None
-            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, None is returned.
+        dict[str, float] | None
+            Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, ``None`` is returned.
         """
         from iminuit import Minuit
 
@@ -571,7 +577,7 @@ class LinearRegressor:
     def plot_overdensity(
         self,
         coefficients: ArrayLike | None = None,
-        ylim: list[float, float] = [0.75, 1.25],
+        ylim: tuple[float, float] = [0.75, 1.25],
         nbinsh: int = 50,
         title: str = None,
     ):
@@ -582,7 +588,7 @@ class LinearRegressor:
         ----------
         coefficients : ArrayLike | None
             parameters for the weight model; if None, will default to the regression result.
-        ylim : list[float, float]
+        ylim : tuple[float, float]
             Limits for the y-axis
         nbinsh : int
             Number of bins for the overlaid histograms
