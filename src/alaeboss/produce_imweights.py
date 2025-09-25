@@ -359,7 +359,7 @@ def produce_imweights(
             nest=templates_maps_nested,
         )
         logger.info(
-            f"Preparation for region {region} is done. Starting regressions per redshift slide."
+            f"Preparation for region {region} is done. Starting regressions per redshift slice."
         )
 
         for z_range in redshift_range:
@@ -405,7 +405,7 @@ def produce_imweights(
 
             # add weights
             datacols = list(selected_data.dtype.names)
-            logger.info(f"Found columns {cols}")
+            logger.info(f"Found columns {datacols}")
 
             match weight_scheme:
                 case None:
