@@ -327,6 +327,7 @@ def produce_imweights(
             for map_name in fitmap_rz
         }
     )
+    all_fit_maps.sort()  # Keep everything in alphabetical order
     logger.debug("All fit maps: %s", all_fit_maps)
 
     # define a fit_maps dictionary in terms of subsets of all_fit_maps
@@ -467,6 +468,7 @@ def produce_imweights(
                 f"Getting weights for region {region} and redshift bin {z_range[0]} < z < {z_range[1]}"
             )
             local_fit_maps = fit_maps[region][z_range]
+            local_fit_maps.sort()  # force same order as all_fit_maps
             local_fit_maps_mask = fit_maps_masks[region][z_range]
             logger.info("Fit maps for this region are %s", local_fit_maps)
             t1 = time()
