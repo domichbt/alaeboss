@@ -89,11 +89,11 @@ def columns_for_weight_scheme(
 
     match tracer:
         case "ELG":
-            data_colnames |= {"o2c"}
+            data_colnames_full = {"o2c"}
         case "LRG" | "BGS":
-            data_colnames |= {"ZWARN", "DELTACHI2"}
+            data_colnames_full = {"ZWARN", "DELTACHI2"}
         case "QSO":
-            pass
+            data_colnames_full = set()
         case _:
             raise KeyError("Unrecognized tracer %s", tracer)
 
@@ -112,18 +112,26 @@ def columns_for_weight_scheme(
             )
         case "fracz":  # 1/FRACZ_TILELOCID based completeness weights
             return (
-                data_colnames | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
+                data_colnames
+                | data_colnames_full
+                | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
                 randoms_colnames,
             )
         case "wt":  # whole weight column
-            return (data_colnames | {"WEIGHT"}, randoms_colnames | {"WEIGHT"})
+            return (
+                data_colnames | data_colnames_full | {"WEIGHT"},
+                randoms_colnames | {"WEIGHT"},
+            )
         case "wtfkp":  # whole weight column plus FKP
             return (
-                data_colnames | {"WEIGHT", "WEIGHT_FKP"},
+                data_colnames | data_colnames_full | {"WEIGHT", "WEIGHT_FKP"},
                 randoms_colnames | {"WEIGHT", "WEIGHT_FKP"},
             )
         case "wt_comp":  # WEIGHT_COMP
-            return (data_colnames | {"WEIGHT_COMP"}, randoms_colnames | {"WEIGHT_COMP"})
+            return (
+                data_colnames | data_colnames_full | {"WEIGHT_COMP"},
+                randoms_colnames | {"WEIGHT_COMP"},
+            )
         case _:
             raise KeyError("Weight scheme %s is not recognized.", weight_scheme)
 
