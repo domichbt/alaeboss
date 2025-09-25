@@ -30,11 +30,11 @@ from pathlib import Path
 from time import time
 
 import fitsio
+import healpy as hp
 import jax
 import LSS.common_tools as common
 import numpy as np
 from astropy.table import Table
-import healpy as hp
 
 from alaeboss.linear_regression import LinearRegressor
 
