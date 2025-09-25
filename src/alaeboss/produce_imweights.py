@@ -195,7 +195,7 @@ def produce_imweights(
     fit_maps: list[str] | dict[str, dict[str, list[str]]],
     output_directory: str | None,
     output_catalog_path: str | None,
-    weight_scheme: str,
+    weight_scheme: str | None,
     output_column_name: str | None = "WEIGHT_IMLIN",
     save_summary_plots: bool = True,
     # Regression-specific arguments
@@ -236,7 +236,7 @@ def produce_imweights(
         Directory where output plots and parameter files will be saved. If None, nothing is saved.
     output_catalog_path : str or None
         Path to the catalog where the output weights should be written. If None, no output is written.
-    weight_scheme : str
+    weight_scheme : str or None
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
             * ``fracz``: 1/(``FRACZ_TILELOCID`` * ``FRAC_TLOBS_TILES``) for the data, 1 for the randoms.
             * ``wt``: ``WEIGHT`` column from the catalog for the data and for the randoms
@@ -619,4 +619,4 @@ def produce_imweights(
         logger.info("Not writing results to disk.")
         all_data_weights = np.ones_like(all_data[redshift_colname], dtype=float)
         all_data_weights[data_selection] = weights_imlin
-        return weights_imlin
+        return all_data_weights
