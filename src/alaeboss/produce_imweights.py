@@ -454,7 +454,7 @@ def produce_imweights(
             ra=region_randoms["RA"],
             dec=region_randoms["DEC"],
             sys_tab=sys_tab,
-            use_maps=fit_maps,
+            use_maps=all_fit_maps,
             nside=templates_maps_nside,
             nest=templates_maps_nested,
         )
