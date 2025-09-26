@@ -48,6 +48,33 @@ def _read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, ne
     )
 
 
+def read_catalog(file_path: str, columns: list[str] | None = None) -> np.ndarray:
+    """
+    Read a catalog from a FITS file and optionally select specific columns.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the FITS file containing the catalog data.
+    columns : list[str] | None, optional
+        List of column names to select from the catalog. If None, all columns are returned.
+
+    Returns
+    -------
+    np.ndarray
+        Numpy structured array containing the catalog data. If `columns` is specified, only the selected columns are returned; otherwise, all columns are returned.
+
+    Notes
+    -----
+    This function uses fitsio under the hood, but avoids asking it to load certain columns only due to performance issues.
+    """
+    whole_catalog = fitsio.read(file_path)  # load ALL columns
+    if columns:
+        return whole_catalog[columns]
+    else:
+        return whole_catalog
+
+
 def columns_for_weight_scheme(
     weight_scheme: str | None,
     redshift_colname: str,
@@ -364,7 +391,7 @@ def produce_imweights(
     all_data = Table(
         np.concatenate(
             [
-                fitsio.read(data_catalog_path, columns=data_colnames)
+                read_catalog(data_catalog_path, columns=data_colnames)
                 for data_catalog_path in data_catalog_paths
             ]
         )
@@ -373,7 +400,7 @@ def produce_imweights(
     logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
     rands = np.concatenate(
         [
-            fitsio.read(random_catalog_path, columns=random_colnames)
+            read_catalog(random_catalog_path, columns=random_colnames)
             for random_catalog_path in random_catalogs_paths
         ]
     )
