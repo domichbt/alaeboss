@@ -152,14 +152,14 @@ mainp = main(
 zmin = mainp.zmin
 zmax = mainp.zmax
 
-maindir = basedir + "/" + args.survey + "/LSS/"
+maindir = os.path.join(basedir, args.survey, "LSS")
 
-ldirspec = maindir + specrel + "/"
+ldirspec = os.path.join(maindir, specrel)
 
-dirout = ldirspec + "LSScats/" + version + "/"
+dirout = os.path.join(ldirspec, "LSScats", version)
 
 dirin = dirout
-lssmapdirout = dirout + "/hpmaps/"
+lssmapdirout = os.path.join(dirout, "hpmaps")
 
 # define column name
 if args.syscol is None:
@@ -258,24 +258,26 @@ if args.imsys_clus:
 
     # define the paths for the input files (loading is deferred to ``produce_imweights``)
     fname_ngc = os.path.join(
-        dirout + args.extra_clus_dir, f"{tracer_type}_NGC_clustering.dat.fits"
+        dirout, args.extra_clus_dir, f"{tracer_type}_NGC_clustering.dat.fits"
     )
 
     fname_sgc = os.path.join(
-        dirout + args.extra_clus_dir, f"{tracer_type}_SGC_clustering.dat.fits"
+        dirout, args.extra_clus_dir, f"{tracer_type}_SGC_clustering.dat.fits"
     )
 
     # get paths for random catalogs (loading is deferred to ``produce_imweights``)
     randoms_fnames = [
         os.path.join(
-            dirout + args.extra_clus_dir,
-            tracer_type + "_NGC_" + str(i) + "_clustering.ran.fits",
+            dirout,
+            args.extra_clus_dir,
+            f"{tracer_type}_NGC_{i}_clustering.ran.fits",
         )
         for i in range(args.nran4imsys)
     ] + [
         os.path.join(
-            dirout + args.extra_clus_dir,
-            tracer_type + "_SGC_" + str(i) + "_clustering.ran.fits",
+            dirout,
+            args.extra_clus_dir,
+            f"{tracer_type}_SGC_{i}_clustering.ran.fits",
         )
         for i in range(args.nran4imsys)
     ]
@@ -323,10 +325,14 @@ if args.imsys_clus:
         weight_scheme=None,
         tracer_type=tracer_type,
         redshift_range=redshift_ranges,
-        templates_maps_path_S=f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_S.fits",
-        templates_maps_path_N=f"{lssmapdirout}{tpstr}_mapprops_healpix_nested_nside{nside}_N.fits",
+        templates_maps_path_S=os.path.join(
+            lssmapdirout, f"{tpstr}_mapprops_healpix_nested_nside{nside}_S.fits"
+        ),
+        templates_maps_path_N=os.path.join(
+            lssmapdirout, f"{tpstr}_mapprops_healpix_nested_nside{nside}_N.fits"
+        ),
         fit_maps=use_maps,
-        output_directory=dirout + args.extra_clus_dir,
+        output_directory=os.path.join(dirout, args.extra_clus_dir),
         output_catalog_path=None,  # writing to disk will be done later to handle SGC/NGC separately
         output_column_name=syscol,
         save_summary_plots=True,
@@ -374,11 +380,11 @@ if args.imsys_clus:
 # Optionally also write the weights in the randoms
 if args.imsys_clus_ran:
     fname = os.path.join(
-        dirout + args.extra_clus_dir, tracer_type + "_NGC_clustering.dat.fits"
+        dirout, args.extra_clus_dir, f"{tracer_type}_NGC_clustering.dat.fits"
     )
     dat_ngc = Table(fitsio.read(fname, columns=["TARGETID", syscol]))
     fname = os.path.join(
-        dirout + args.extra_clus_dir, tracer_type + "_SGC_clustering.dat.fits"
+        dirout, args.extra_clus_dir, f"{tracer_type}_SGC_clustering.dat.fits"
     )
     dat_sgc = Table(fitsio.read(fname, columns=["TARGETID", syscol]))
     dat = vstack([dat_sgc, dat_ngc])
@@ -391,8 +397,9 @@ if args.imsys_clus_ran:
     def _add2ran(rann):
         for reg in regl:
             ran_fn = os.path.join(
-                dirout + args.extra_clus_dir,
-                tracer_type + "_" + reg + "_" + str(rann) + "_clustering.ran.fits",
+                dirout,
+                args.extra_clus_dir,
+                f"{tracer_type}_{reg}_{rann}_clustering.ran.fits",
             )
             ran = Table(fitsio.read(ran_fn))
             if syscolr in ran.colnames:
@@ -422,14 +429,17 @@ if args.add_syscol2blind:
     dats = []
     for reg in ["NGC", "SGC"]:
         fname = os.path.join(
-            dirout + args.extra_clus_dir,
-            tracer_type + "_" + reg + "_clustering.dat.fits",
+            dirout,
+            args.extra_clus_dir,
+            f"{tracer_type}_{reg}_clustering.dat.fits",
         )
         dati = Table(fitsio.read(fname, columns=["TARGETID", syscol]))
         dats.append(dati)
         fname_blind = os.path.join(
-            dirout + args.extra_clus_dir + "/blinded/",
-            tracer_type + "_" + reg + "_clustering.dat.fits",
+            dirout,
+            args.extra_clus_dir,
+            "blinded",
+            f"{tracer_type}_{reg}_clustering.dat.fits",
         )
         dat_blind = Table(fitsio.read(fname_blind))
         if syscol in list(dat_blind.colnames):
@@ -449,8 +459,10 @@ if args.add_syscol2blind:
     def _add2ranblind(rann):
         for reg in regl:
             ran_fn = os.path.join(
-                dirout + args.extra_clus_dir + "/blinded/",
-                tracer_type + "_" + reg + "_" + str(rann) + "_clustering.ran.fits",
+                dirout,
+                args.extra_clus_dir,
+                "blinded",
+                f"{tracer_type}_{reg}_{rann}_clustering.ran.fits",
             )
             ran = Table(fitsio.read(ran_fn))
             if syscolr in ran.colnames:
