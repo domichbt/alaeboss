@@ -291,8 +291,8 @@ if args.imsys_clus:
         while zm < zsysmax:
             zx = zm + dz
             zx = round(zx, 1)
-            zm = zx
             redshift_ranges += [(zm, zx)]
+            zm = zx
         use_maps = fit_maps
 
     elif args.imsys_1zbin:
