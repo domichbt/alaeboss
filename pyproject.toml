@@ -24,7 +24,7 @@ dependencies = [
 DESI=["healpy", "astropy"]
 
 [tool.ruff.lint]
-select = ["D", "E", "I"]
+select = ["D", "E", "I", "B", "F"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]

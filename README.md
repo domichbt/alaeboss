@@ -2,3 +2,4 @@ Code to obtain imaging systematics weights for the galaxies of a spectroscopic s
 
 Module `linear_regression.py` implements the regression, providing a huge speed-up compared to the former implementation by using JAX and feeding the gradient to Minuit.
 The `produce_imweights.py` script gives an example wrapper function that runs the regression on DESI data in an efficient way (minimal amount of I/O and random catalog manipulation).
+The `add_imlin.py` script is designed to run like an `LSS` command line script.
