@@ -1,0 +1,2 @@
+source /global/common/software/desi/users/adematti/cosmodesi_environment.sh test
+python scripts/add_imlin.py --type LRG --basedir $SCRATCH/imsys_fastload --version v1.5 --survey Y1 --verspec iron --imsys_1zbin --imsys_clus --nran4imsys 2 --extra_clus_dir ''

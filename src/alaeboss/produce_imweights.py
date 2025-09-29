@@ -26,6 +26,7 @@ You can setup a basic logger to pass to the function as
 """
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 from time import time
 
@@ -45,6 +46,33 @@ def _read_systematic_templates_stacked_alt(ra, dec, sys_tab, use_maps, nside, ne
     return np.vstack(
         [systematics_values[column_name] for column_name in systematics_values.colnames]
     )
+
+
+def read_catalog(file_path: str, columns: list[str] | None = None) -> np.ndarray:
+    """
+    Read a catalog from a FITS file and optionally select specific columns.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the FITS file containing the catalog data.
+    columns : list[str] | None, optional
+        List of column names to select from the catalog. If None, all columns are returned.
+
+    Returns
+    -------
+    np.ndarray
+        Numpy structured array containing the catalog data. If `columns` is specified, only the selected columns are returned; otherwise, all columns are returned.
+
+    Notes
+    -----
+    This function uses fitsio under the hood, but avoids asking it to load certain columns only due to performance issues.
+    """
+    whole_catalog = fitsio.read(file_path)  # load ALL columns
+    if columns:
+        return whole_catalog[columns]
+    else:
+        return whole_catalog
 
 
 def columns_for_weight_scheme(
@@ -88,11 +116,11 @@ def columns_for_weight_scheme(
 
     match tracer:
         case "ELG":
-            data_colnames |= {"o2c"}
+            data_colnames_full = {"o2c"}
         case "LRG" | "BGS":
-            data_colnames |= {"ZWARN", "DELTACHI2"}
+            data_colnames_full = {"ZWARN", "DELTACHI2"}
         case "QSO":
-            pass
+            data_colnames_full = set()
         case _:
             raise KeyError("Unrecognized tracer %s", tracer)
 
@@ -111,20 +139,83 @@ def columns_for_weight_scheme(
             )
         case "fracz":  # 1/FRACZ_TILELOCID based completeness weights
             return (
-                data_colnames | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
+                data_colnames
+                | data_colnames_full
+                | {"FRACZ_TILELOCID", "FRAC_TLOBS_TILES"},
                 randoms_colnames,
             )
         case "wt":  # whole weight column
-            return (data_colnames | {"WEIGHT"}, randoms_colnames | {"WEIGHT"})
+            return (
+                data_colnames | data_colnames_full | {"WEIGHT"},
+                randoms_colnames | {"WEIGHT"},
+            )
         case "wtfkp":  # whole weight column plus FKP
             return (
-                data_colnames | {"WEIGHT", "WEIGHT_FKP"},
+                data_colnames | data_colnames_full | {"WEIGHT", "WEIGHT_FKP"},
                 randoms_colnames | {"WEIGHT", "WEIGHT_FKP"},
             )
         case "wt_comp":  # WEIGHT_COMP
-            return (data_colnames | {"WEIGHT_COMP"}, randoms_colnames | {"WEIGHT_COMP"})
+            return (
+                data_colnames | data_colnames_full | {"WEIGHT_COMP"},
+                randoms_colnames | {"WEIGHT_COMP"},
+            )
         case _:
             raise KeyError("Weight scheme %s is not recognized.", weight_scheme)
+
+
+def make_fit_maps_dictionary(
+    default: list[str],
+    except_when: list[tuple[str, tuple[float, float], list[str]]],
+    regions: list[str],
+    redshift_range: list[tuple[float, float]],
+) -> dict[str, dict[str, list[str]]]:
+    """
+    Create a dictionary of systematics maps to feed to :py:func:`~alaeboss.produce_imweights.produce_imweights`.
+
+    In the simplest case, all maps are the same for all photometric regions and redshift ranges. If you wish to differ from this (for example to follow the DESI DR1 LRG procedure) then define the exceptions here.
+    Be wary that regions must match to the internal ones in :py:func:`~alaeboss.produce_imweights.produce_imweights`, ie ["N", "S"] for most tracers and ["N", "SnotDES", "DES"] for QSOs. This function itself does not make any checks.
+
+    Parameters
+    ----------
+    default : list[str]
+        List of maps to default to.
+    except_when : list[tuple[str, tuple[float, float], list[str]]]
+        List of conditions and corresponding alternative maps, under the form [(region, (z_min, z_max), [map1, map2, ...]), ...]. Set to ``None`` to keep the default everywhere.
+    regions : list[str]
+        List of all photometry regions.
+    redshift_range : list[tuple[float, float]]
+        List of all redshift ranges.
+
+    Returns
+    -------
+    dict[str, dict[str, list[str]]]
+        Dictionary of the form ``{region:{(z_min, z_max):fit_maps}}``.
+
+    Examples
+    --------
+    In a regular usecase with QSOs, where no deviation from default is expected (dummy map names for brevity):
+
+    >>> make_fit_maps_dictionary(default=["map1", "map2"], except_when=None, regions=["N", "SnotDES", "DES"], redshift_range=[(0.8, 1.3), (1.3, 2.1), (2.1, 3.5)])
+    {'N': {(0.8, 1.3): ['map1', 'map2'], (1.3, 2.1): ['map1', 'map2'], (2.1, 3.5): ['map1', 'map2']}, 'SnotDES': {(0.8, 1.3): ['map1', 'map2'], (1.3, 2.1): ['map1', 'map2'], (2.1, 3.5): ['map1', 'map2']}, 'DES': {(0.8, 1.3): ['map1', 'map2'], (1.3, 2.1): ['map1', 'map2'], (2.1, 3.5): ['map1', 'map2']}}
+
+    With LRGs, using a different set of maps in the North (dummy map names for brevity):
+
+    >>> make_fit_maps_dictionary(default=["map1", "map2"], except_when=[("N", (0.4, 0.6), ["map1"]), ("N", (0.6, 0.8), ["map1"]), ("N", (0.8, 1.3), ["map1"])], regions=["N", "S"], redshift_range=[(0.4, 0.6), (0.6, 0.8), (0.8, 1.1)])
+    {'N': {(0.4, 0.6): ['map1'], (0.6, 0.8): ['map1'], (0.8, 1.1): ['map1', 'map2'], (0.8, 1.3): ['map1']}, 'S': {(0.4, 0.6): ['map1', 'map2'], (0.6, 0.8): ['map1', 'map2'], (0.8, 1.1): ['map1', 'map2']}}
+
+    With LRGs, using a different set of maps for each redshift bin in the North:
+
+    >>> make_fit_maps_dictionary(default=["map1", "map2"], except_when=[("N", (0.4, 0.6), ["map1"]), ("N", (0.6, 0.8), ["map2"]), ("N", (0.8, 1.3), ["map3"])], regions=["N", "S"], redshift_range=[(0.4, 0.6), (0.6, 0.8), (0.8, 1.1)])
+    {'N': {(0.4, 0.6): ['map1'], (0.6, 0.8): ['map2'], (0.8, 1.1): ['map1', 'map2'], (0.8, 1.3): ['map3']}, 'S': {(0.4, 0.6): ['map1', 'map2'], (0.6, 0.8): ['map1', 'map2'], (0.8, 1.1): ['map1', 'map2']}}
+    """
+    fit_maps_dictionary = {
+        region: {zrange: default for zrange in redshift_range} for region in regions
+    }
+    if except_when is not None:
+        for region, zrange, alternative_maps in except_when:
+            fit_maps_dictionary[region][zrange] = alternative_maps
+
+    return fit_maps_dictionary
 
 
 def produce_imweights(
@@ -136,10 +227,10 @@ def produce_imweights(
     redshift_range: list[(float, float)],
     templates_maps_path_S: str,
     templates_maps_path_N: str,
-    fit_maps: list[str],
+    fit_maps: list[str] | dict[str, dict[str, list[str]]],
     output_directory: str | None,
     output_catalog_path: str | None,
-    weight_scheme: str,
+    weight_scheme: str | None,
     output_column_name: str | None = "WEIGHT_IMLIN",
     save_summary_plots: bool = True,
     # Regression-specific arguments
@@ -174,13 +265,13 @@ def produce_imweights(
         Nside for the template maps that are being loaded from this path. Default is 256.
     templates_maps_nested : bool
         Whether template maps are in the nested scheme. Default is True.
-    fit_maps : list[str]
-        List of template map names to use in the regression.
+    fit_maps : list[str] | dict[str, dict[str, list[str]]]
+        List of template map names to use in the regression. If list of strings, will use the same maps for all regions and redshift ranges. Otherwise, can provide a dictionary of the form ``{region:{(z_min, z_max):fit_maps}}``. Function :py:func:`~alaeboss.produce_imweights.make_fit_maps_dictionary` can help produce these.
     output_directory : str or None
         Directory where output plots and parameter files will be saved. If None, nothing is saved.
     output_catalog_path : str or None
         Path to the catalog where the output weights should be written. If None, no output is written.
-    weight_scheme : str
+    weight_scheme : str or None
         Which weights to apply on the data and randoms (typically to account for uncompleteness when regressing). The corresponding columns need to be available in the catalog.
             * ``fracz``: 1/(``FRACZ_TILELOCID`` * ``FRAC_TLOBS_TILES``) for the data, 1 for the randoms.
             * ``wt``: ``WEIGHT`` column from the catalog for the data and for the randoms
@@ -214,6 +305,8 @@ def produce_imweights(
     Loading some columns only from FITS file during NERSC jobs can be very long for mysterious reasons. If you are experiencing huge catalog readtimes, this might be why.
 
     """
+    time_start = time()
+
     logger = logger or logging.getLogger("dummy")
 
     logger.info("Doing linear regression for imaging systematics")
@@ -232,10 +325,50 @@ def produce_imweights(
         )
         redshift_colname = "Z_not4clus"
 
+    # define photometric regions
+    photometric_regions = ["S", "N"]
+    if tracer_type == "QSO":
+        photometric_regions = ["DES", "SnotDES", "N"]
+
+    # Check if fit_maps is a list of strings or a dictionary
+    if isinstance(fit_maps, dict):
+        pass
+    elif isinstance(fit_maps, Sequence) and isinstance(fit_maps[0], str):
+        # do the conversion to a dictionary now
+        fit_maps = make_fit_maps_dictionary(
+            default=fit_maps,
+            except_when=None,
+            regions=photometric_regions,
+            redshift_range=redshift_range,
+        )
+    else:
+        raise TypeError(
+            "Argument `fit_maps` is neither a dictionary nor a list of strings."
+        )
+    # Define a union of all fit maps to make sure to prepare any fit map needed
+    all_fit_maps = list(
+        {
+            map_name
+            for fitmap_r in fit_maps.values()
+            for fitmap_rz in fitmap_r.values()
+            for map_name in fitmap_rz
+        }
+    )
+    all_fit_maps.sort()  # Keep everything in alphabetical order
+    logger.debug("All fit maps: %s", all_fit_maps)
+
+    # define a fit_maps dictionary in terms of subsets of all_fit_maps
+    fit_maps_masks = {}  # For each region and redshift range, indicate which fit maps are used in terms of a mask of ``all_fit_maps``
+    for region, fit_maps_r in fit_maps.items():
+        fit_maps_masks[region] = {}
+        for zrange, fit_maps_rz in fit_maps_r.items():
+            fit_maps_masks[region][zrange] = np.array(
+                [(mapname in fit_maps_rz) for mapname in all_fit_maps], dtype=bool
+            )
+    logger.debug("Masks map dictionary: %s", fit_maps_masks)
+
     jax.config.update("jax_enable_x64", True)
     logger.info("Enabled 64-bit mode for JAX")
-
-    time_start = time()
 
     # define which columns will need to be loaded for the data and the randoms
     data_colnames, random_colnames = columns_for_weight_scheme(
@@ -258,7 +391,7 @@ def produce_imweights(
     all_data = Table(
         np.concatenate(
             [
-                fitsio.read(data_catalog_path, columns=data_colnames)
+                read_catalog(data_catalog_path, columns=data_colnames)
                 for data_catalog_path in data_catalog_paths
             ]
         )
@@ -267,7 +400,7 @@ def produce_imweights(
     logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
     rands = np.concatenate(
         [
-            fitsio.read(random_catalog_path, columns=random_colnames)
+            read_catalog(random_catalog_path, columns=random_colnames)
             for random_catalog_path in random_catalogs_paths
         ]
     )
@@ -284,11 +417,6 @@ def produce_imweights(
 
     # prepare array to receive computed weights
     weights_imlin = np.ones(len(dat), dtype=float)
-
-    # define photometric regions
-    photometric_regions = ["S", "N"]
-    if tracer_type == "QSO":
-        photometric_regions = ["DES", "SnotDES", "N"]
 
     for region in photometric_regions:
         # Are we north or south? (irrespective of DES)
@@ -317,19 +445,19 @@ def produce_imweights(
                 sys_tab[col] *= 10 ** (-0.4 * common.ext_coeff[bnd] * sys_tab["EBV"])
         for ec in ["GR", "RZ"]:
             sys_tab["EBV_DIFF_" + ec] = debv["EBV_DIFF_" + ec]
-        if "EBV_DIFF_MPF" in fit_maps:
+        if "EBV_DIFF_MPF" in all_fit_maps:
             sys_tab["EBV_DIFF_MPF"] = sys_tab["EBV"] - sys_tab["EBV_MPF_Mean_FW15"]
-        if "SKY_RES_G" in fit_maps:
+        if "SKY_RES_G" in all_fit_maps:
             sys_tab["SKY_RES_G"] = sky_g[northsouth]
-        if "SKY_RES_R" in fit_maps:
+        if "SKY_RES_R" in all_fit_maps:
             sys_tab["SKY_RES_R"] = sky_r[northsouth]
-        if "SKY_RES_Z" in fit_maps:
+        if "SKY_RES_Z" in all_fit_maps:
             sys_tab["SKY_RES_Z"] = sky_z[northsouth]
 
-        logger.info(f"Maps for regression: {fit_maps}")
+        logger.info("All maps available for regression: %s", all_fit_maps)
 
         # select randoms now and retrieve systematics
-        logger.info("Masking randoms according to the region")
+        logger.info("Masking randoms according to the photometry region %s", region)
         match region:
             case "N" | "S":
                 region_mask_randoms = rands["PHOTSYS"] == region
@@ -348,24 +476,28 @@ def produce_imweights(
                 logger.info("other regions not currently supported")
                 raise NotImplementedError("Exiting due to critical error with region")
         region_randoms = rands[region_mask_randoms]
-        # rand_syst = densvar.read_systematic_maps_alt(region_randoms['RA'], region_randoms['DEC'], sys_tab, use_maps)
+
         logger.info("Reading template values for the randoms")
         randoms_templates_values = _read_systematic_templates_stacked_alt(
             ra=region_randoms["RA"],
             dec=region_randoms["DEC"],
             sys_tab=sys_tab,
-            use_maps=fit_maps,
+            use_maps=all_fit_maps,
             nside=templates_maps_nside,
             nest=templates_maps_nested,
         )
         logger.info(
-            f"Preparation for region {region} is done. Starting regressions per redshift slide."
+            f"Preparation for region {region} is done. Starting regressions per redshift slice."
         )
 
         for z_range in redshift_range:
             logger.info(
                 f"Getting weights for region {region} and redshift bin {z_range[0]} < z < {z_range[1]}"
             )
+            local_fit_maps = fit_maps[region][z_range]
+            local_fit_maps.sort()  # force same order as all_fit_maps
+            local_fit_maps_mask = fit_maps_masks[region][z_range]
+            logger.info("Fit maps for this region are %s", local_fit_maps)
             t1 = time()
             # select data
             logger.info("Selecting data and loading template values")
@@ -384,18 +516,20 @@ def produce_imweights(
                 )
                 selected_randoms = region_randoms[selection_randoms]
                 selected_randoms_templates_values = randoms_templates_values[
-                    :, selection_randoms
-                ]
+                    local_fit_maps_mask, :
+                ][:, selection_randoms]
             else:
                 selected_randoms = region_randoms
-                selected_randoms_templates_values = randoms_templates_values
+                selected_randoms_templates_values = randoms_templates_values[
+                    local_fit_maps_mask, :
+                ]
 
             # get data imaging systematics
             data_templates_values = _read_systematic_templates_stacked_alt(
                 ra=selected_data["RA"],
                 dec=selected_data["DEC"],
                 sys_tab=sys_tab,
-                use_maps=fit_maps,
+                use_maps=local_fit_maps,
                 nside=templates_maps_nside,
                 nest=templates_maps_nested,
             )
@@ -405,7 +539,7 @@ def produce_imweights(
 
             # add weights
             datacols = list(selected_data.dtype.names)
-            logger.info(f"Found columns {cols}")
+            logger.info(f"Found columns {datacols}")
 
             match weight_scheme:
                 case None:
@@ -464,7 +598,7 @@ def produce_imweights(
                 random_weights=rand_we,
                 template_values_data=data_templates_values,
                 template_values_randoms=selected_randoms_templates_values,
-                template_names=fit_maps,
+                template_names=local_fit_maps,
                 loglevel=loglevel,
             )
             regressor.cut_outliers(tail=tail)
@@ -522,4 +656,4 @@ def produce_imweights(
         logger.info("Not writing results to disk.")
         all_data_weights = np.ones_like(all_data[redshift_colname], dtype=float)
         all_data_weights[data_selection] = weights_imlin
-        return weights_imlin
+        return all_data_weights
