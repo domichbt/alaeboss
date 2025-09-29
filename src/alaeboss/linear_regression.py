@@ -464,7 +464,7 @@ class LinearRegressor:
         else:
             self.logger.info("Minimization succeeded, chisquare = %f", self.chi2(res.x))
             self.coefficients = res.x
-            return dict(zip([self.constant] + self.template_names, res.x))
+            return dict(zip([self.constant] + self.template_names, res.x, strict=True))
 
     def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
@@ -504,7 +504,9 @@ class LinearRegressor:
                 "Minimization succeeded, chisquare = %f\n%s", m.fval, m.fmin
             )
             self.coefficients = jnp.array(m.values)
-            return dict(zip([self.constant] + self.template_names, list(m.values)))
+            return dict(
+                zip([self.constant] + self.template_names, list(m.values), strict=True)
+            )
 
     def export_weights(self) -> ArrayLike:
         """
@@ -623,7 +625,9 @@ class LinearRegressor:
             self.normalization * self.data_binned_noweights / self.randoms_binned - 1
         ) ** 2 / self.error**2
 
-        for index, (coefficient_name, ax) in enumerate(zip(self.template_names, axes)):
+        for index, (coefficient_name, ax) in enumerate(
+            zip(self.template_names, axes, strict=True)
+        ):
             partial_chi2_noweights = (chi2_arr_noweights[index]).sum()
             ax.errorbar(
                 centers[index],
