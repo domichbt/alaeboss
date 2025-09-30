@@ -135,7 +135,7 @@ parser.add_argument(
 
 
 args = parser.parse_args()
-common.printlog(str(args), logger)
+logger.info("Parsed arguments: %s", args)
 
 # Use arguments to define various paths and get the redshift range of the tracer
 
@@ -174,7 +174,6 @@ if args.syscol is None:
         syscol = "WEIGHT_IMLIN_FINEZBIN"
 else:
     syscol = args.syscol
-logger.info("Using %s as column name for the computed weights.", syscol)
 
 # define maps to use for the regression
 if args.usemaps is None:
@@ -201,8 +200,9 @@ if args.exclude_debv:
 if args.Y1_mode:
     syscol = args.syscol
     fit_maps = mainp.fit_maps
-    logger.info("Fit maps are set to Y1 choices; weight column will be %s", args.syscol)
+    logger.info("Fit maps are set to Y1 choices; weight column will be %s", syscol)
 
+logger.info("Using %s as column name for the computed weights.", syscol)
 logger.info("Using the following systematics maps for the regression: %s", fit_maps)
 
 # Define the redshift ranges for the regression
