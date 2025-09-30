@@ -147,7 +147,10 @@ rm = int(args.minr)
 rx = int(args.maxr)
 
 mainp = main(
-    args.type, args.verspec, survey=args.survey, relax_zbounds=args.relax_zbounds
+    args.type,
+    args.verspec,
+    survey=args.survey,
+    relax_zbounds="y" if args.relax_zbounds else "n",
 )
 zmin = mainp.zmin
 zmax = mainp.zmax
