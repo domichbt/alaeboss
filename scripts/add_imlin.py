@@ -179,8 +179,8 @@ logger.info("Using %s as column name for the computed weights.", syscol)
 # define maps to use for the regression
 if args.usemaps is None:
     fit_maps = mainp.fit_maps
-    if args.imsys_finezbin:
-        fit_maps = mainp.fit_maps_all
+    # if args.imsys_finezbin: # disabled for now
+    #     fit_maps = mainp.fit_maps_all
 elif args.usemaps[0] == "all":
     fit_maps = mainp.fit_maps_all
     syscol += "_ALL"
