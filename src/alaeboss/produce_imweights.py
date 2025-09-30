@@ -209,7 +209,7 @@ def make_fit_maps_dictionary(
     {'N': {(0.4, 0.6): ['map1'], (0.6, 0.8): ['map2'], (0.8, 1.1): ['map1', 'map2'], (0.8, 1.3): ['map3']}, 'S': {(0.4, 0.6): ['map1', 'map2'], (0.6, 0.8): ['map1', 'map2'], (0.8, 1.1): ['map1', 'map2']}}
     """
     fit_maps_dictionary = {
-        region: {zrange: default for zrange in redshift_range} for region in regions
+        region: dict.fromkeys(redshift_range, default) for region in regions
     }
     if except_when is not None:
         for region, zrange, alternative_maps in except_when:
@@ -225,8 +225,8 @@ def produce_imweights(
     is_clustering_catalog: bool,
     tracer_type: str,
     redshift_range: list[(float, float)],
-    templates_maps_path_S: str,
-    templates_maps_path_N: str,
+    templates_maps_path_S: str,  # noqa: N803
+    templates_maps_path_N: str,  # noqa: N803
     fit_maps: list[str] | dict[str, dict[str, list[str]]],
     output_directory: str | None,
     output_catalog_path: str | None,
@@ -237,7 +237,7 @@ def produce_imweights(
     nbins: int = 10,
     tail: float = 0.5,
     # Miscellaneous
-    logger: logging.Logger = None,
+    logger: logging.Logger | None = None,
     loglevel: str = "INFO",
     templates_maps_nside: int = 256,
     templates_maps_nested: bool = True,
@@ -487,12 +487,16 @@ def produce_imweights(
             nest=templates_maps_nested,
         )
         logger.info(
-            f"Preparation for region {region} is done. Starting regressions per redshift slice."
+            "Preparation for region %s is done. Starting regressions per redshift slice.",
+            region,
         )
 
         for z_range in redshift_range:
             logger.info(
-                f"Getting weights for region {region} and redshift bin {z_range[0]} < z < {z_range[1]}"
+                "Getting weights for region %s and redshift bin %f < z < %f",
+                region,
+                z_range[0],
+                z_range[1],
             )
             local_fit_maps = fit_maps[region][z_range]
             local_fit_maps.sort()  # force same order as all_fit_maps
@@ -539,7 +543,7 @@ def produce_imweights(
 
             # add weights
             datacols = list(selected_data.dtype.names)
-            logger.info(f"Found columns {datacols}")
+            logger.info("Found columns %s", datacols)
 
             match weight_scheme:
                 case None:
@@ -606,7 +610,7 @@ def produce_imweights(
             optimized_parameters = regressor.regress_minuit()
 
             logger.info("Regression done!")
-            logger.info(f"Optimized parameters are {optimized_parameters}")
+            logger.info("Optimized parameters are %s", optimized_parameters)
 
             if output_directory is not None:
                 output_directory.mkdir(parents=True, exist_ok=True)
@@ -614,18 +618,18 @@ def produce_imweights(
                     output_directory
                     / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linfitparam_jax.txt"
                 )
-                logger.info(f"Writing to {output_loc}")
+                logger.info("Writing to %s", output_loc)
                 with open(output_loc, "w") as fo:
                     for par_name, par_value in optimized_parameters.items():
-                        fo.write(str(par_name) + " " + str(par_value) + "\n")
+                        fo.write(f"{par_name} {par_value}\n")
 
                 if save_summary_plots:
                     figname = (
                         output_directory
                         / f"{tracer_type}_{region}_{z_range[0]:.1f}_{z_range[1]:.1f}_linimsysfit_jax.png"
                     )
-                    logger.info(f"Saving figure to {figname}")
-                    fig, axes = regressor.plot_overdensity(ylim=[0.7, 1.3])
+                    logger.info("Saving figure to %s", figname)
+                    fig, _ = regressor.plot_overdensity(ylim=[0.7, 1.3])
                     fig.savefig(figname)
             else:
                 logger.info(
@@ -635,7 +639,11 @@ def produce_imweights(
             weights_imlin[selection_data] = regressor.export_weights()
             t2 = time()
             logger.info(
-                f"Done with region {region} and redshift bin {z_range[0]} < z < {z_range[1]}, took {t2 - t1} seconds"
+                "Done with region %s and redshift bin %f < z < %s, took %f seconds",
+                region,
+                z_range[0],
+                z_range[1],
+                t2 - t1,
             )
 
     time_end = time()

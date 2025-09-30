@@ -108,9 +108,7 @@ class LinearRegressor:
         self._template_name_to_idx = {
             name: idx for idx, name in enumerate(self.template_names)
         }
-        self._idx_to_template_name = {
-            idx: name for idx, name in enumerate(self.template_names)
-        }
+        self._idx_to_template_name = dict(enumerate(self.template_names))
 
         # Find bad values and build mask with the shape of the data/the randoms
         self.good_values_data = jnp.invert(
@@ -373,16 +371,9 @@ class LinearRegressor:
         )
         self.logger.debug("Computed error on histogram ratio")
         self.initial_chi2 = jnp.sum(
-            (
-                (
-                    self.normalization
-                    * self.data_binned_noweights
-                    / self.randoms_binned
-                    - 1
-                )
-                ** 2
-                / self.error**2
-            )
+            (self.normalization * self.data_binned_noweights / self.randoms_binned - 1)
+            ** 2
+            / self.error**2
         )
         self.logger.debug("Computed initial, correction-less chi2")
 
@@ -429,10 +420,8 @@ class LinearRegressor:
         #     jnp.sqrt(data_binned / self.randoms_binned**2 + data_binned**2 / self.randoms_binned**3) # model dependent error
         # Compute the chisquare over actual imaging templates (not the constant, which is mostly useful for the weight model)
         return jnp.sum(
-            (
-                (self.normalization * data_binned / self.randoms_binned - 1) ** 2
-                / self.error**2
-            )
+            (self.normalization * data_binned / self.randoms_binned - 1) ** 2
+            / self.error**2
         )
 
     def regress(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
@@ -581,7 +570,7 @@ class LinearRegressor:
         coefficients: ArrayLike | None = None,
         ylim: tuple[float, float] = [0.75, 1.25],
         nbinsh: int = 50,
-        title: str = None,
+        title: str | None = None,
     ):
         """
         Create a subplot for each template, and plot the normalized histogram values before and after the regression. The initial distribution of the template on the data is overlaid on the bottom of the plot.
