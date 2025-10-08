@@ -220,8 +220,8 @@ def make_fit_maps_dictionary(
 
 def produce_imweights(
     # Input and output control
-    data_catalog_paths: list[str],
-    random_catalogs_paths: list[str],
+    data_catalogs: np.ndarray,
+    randoms_catalogs: np.ndarray,
     is_clustering_catalog: bool,
     tracer_type: str,
     redshift_range: list[(float, float)],
@@ -249,10 +249,10 @@ def produce_imweights(
 
     Parameters
     ----------
-    data_catalog_paths : list[str]
-        Path to the input data catalogs FITS files.
-    random_catalogs_paths : list[str]
-        List of paths to random catalogs FITS files.
+    data_catalogs : np.ndarray
+        Concatenated input data catalogs.
+    randoms_catalogs : np.ndarray
+        Concatenated input randoms catalogs.
     tracer_type : str
         Type of tracer (e.g., 'LRG', 'ELG_LOP', 'QSO').
     redshift_range : list of tuple of float
@@ -370,7 +370,7 @@ def produce_imweights(
     jax.config.update("jax_enable_x64", True)
     logger.info("Enabled 64-bit mode for JAX")
 
-    # define which columns will need to be loaded for the data and the randoms
+    # define which columns need to be present for the data and the randoms
     data_colnames, random_colnames = columns_for_weight_scheme(
         weight_scheme=weight_scheme,
         redshift_colname=redshift_colname,
@@ -378,32 +378,20 @@ def produce_imweights(
     )
     data_colnames = list(data_colnames)
     random_colnames = list(random_colnames)
-    logger.debug("Columns to load for the data: %s", data_colnames)
-    logger.debug("Columns to load for the randoms: %s", random_colnames)
+    logger.debug("Columns necessary for the data: %s", data_colnames)
+    logger.debug("Columns necessary for the randoms: %s", random_colnames)
 
     debv = common.get_debv()  # for later
     sky_g, sky_r, sky_z = common.get_skyres()
     if output_directory is not None:
         output_directory = Path(output_directory)
 
-    # read data catalogs
-    logger.info("Reading data catalogs")
-    all_data = Table(
-        np.concatenate(
-            [
-                read_catalog(data_catalog_path, columns=data_colnames)
-                for data_catalog_path in data_catalog_paths
-            ]
-        )
-    )
-    # read randoms catalogs (note that since we are reading a subset of columns, this can take a lot on time from a job, no idea why)
-    logger.info("Reading %i randoms catalogs", len(random_catalogs_paths))
-    rands = np.concatenate(
-        [
-            read_catalog(random_catalog_path, columns=random_colnames)
-            for random_catalog_path in random_catalogs_paths
-        ]
-    )
+    # copy data/randoms to avoid modifying in place
+    # and check that necessary columns are present
+    logger.info("There are %i rows of data", data_catalogs.size)
+    all_data = Table(data_catalogs[data_colnames], copy=True)
+    logger.info("There are %i rows of data", randoms_catalogs.size)
+    rands = randoms_catalogs[random_colnames].copy()
 
     # select good data that has been observed
     if not is_clustering_catalog:
