@@ -7,6 +7,7 @@ The script is designed to mimic existing LSS scripts (in particular ``add_imlin_
 import argparse
 import logging
 import os
+from pathlib import Path
 import sys
 
 import fitsio
@@ -257,19 +258,23 @@ sky_g, sky_r, sky_z = common.get_skyres()
 
 # Do the regression
 if args.imsys_clus:
-    from alaeboss.produce_imweights import make_fit_maps_dictionary, produce_imweights
+    from LSS.imaging.systematics_linear_regression import (
+        make_fit_maps_dictionary,
+        produce_imweights,
+        read_catalog,
+    )
 
-    # define the paths for the input files (loading is deferred to ``produce_imweights``)
-    fname_ngc = os.path.join(
+    # define the paths for the input files
+    fname_ngc_out = os.path.join(
         dirout, args.extra_clus_dir, f"{tracer_type}_NGC_clustering.dat.fits"
     )
 
-    fname_sgc = os.path.join(
+    fname_sgc_out = os.path.join(
         dirout, args.extra_clus_dir, f"{tracer_type}_SGC_clustering.dat.fits"
     )
 
-    # get paths for random catalogs (loading is deferred to ``produce_imweights``)
-    randoms_fnames = [
+    # get paths for random catalogs
+    randoms_fnames_out = [
         os.path.join(
             dirout,
             args.extra_clus_dir,
@@ -284,6 +289,48 @@ if args.imsys_clus:
         )
         for i in range(args.nran4imsys)
     ]
+
+    # If on NERSC and applicable, for the INPUT files, switch to dvs_ro
+    def global_to_dvs_ro(path: str) -> str:
+        """
+        If the root directory of the path is ``global``, returns the same path using ``dvs_ro`` instead. Otherwise, returns the original path unchanged.
+
+        Parameters
+        ----------
+        path : str
+            Any path.
+
+        Returns
+        -------
+        str
+            Same as input path with leading ``global`` switched to ``dvs_ro`` if applicable.
+        """
+        posixpath = Path(path)
+        path_parts = posixpath.parts
+        if (
+            len(path_parts) > 2
+            and posixpath.is_absolute()
+            and path_parts[1] == "global"
+        ):
+            posixpath = Path("/dvs_ro").joinpath(*path_parts[2:])
+        return str(posixpath)
+
+    fname_sgc_in = global_to_dvs_ro(fname_sgc_out)
+    fname_ngc_in = global_to_dvs_ro(fname_ngc_out)
+    randoms_fnames_in = [
+        global_to_dvs_ro(randoms_fname) for randoms_fname in randoms_fnames_out
+    ]
+
+    # Load the data and randoms
+    # Get all columns since they will be used for writing later
+    data_sgc = read_catalog(fname_sgc_in, columns=None)
+    data_ngc = read_catalog(fname_ngc_in, columns=None)
+
+    data_catalogs = np.concatenate([data_sgc, data_ngc])
+
+    randoms_catalogs = np.concatenate(
+        [read_catalog(fname, columns=None) for fname in randoms_fnames_in]
+    )
 
     # Get redshift ranges
     if args.imsys_finezbin:
@@ -322,8 +369,8 @@ if args.imsys_clus:
 
     # perform regression
     weights = produce_imweights(
-        data_catalog_paths=[fname_sgc, fname_ngc],
-        random_catalogs_paths=randoms_fnames,
+        data_catalogs=data_catalogs,
+        randoms_catalogs=randoms_catalogs,
         is_clustering_catalog=True,
         weight_scheme=None,
         tracer_type=tracer_type,
@@ -349,9 +396,9 @@ if args.imsys_clus:
 
     ## attach data to NGC/SGC catalogs, write those out
 
-    # Need to load the data individual data catalogs again
-    data_sgc = Table.read(fname_sgc)
-    data_ngc = Table.read(fname_ngc)
+    # Data catalogs are already loaded, just recast them to astropy Tables
+    data_sgc = Table(data_sgc)
+    data_ngc = Table(data_ngc)
     # Catalogs are just concatenated in the order SGC, NGC
     # so this is enough to assign weights to the correct one
     transition_index = len(data_sgc)
@@ -371,12 +418,12 @@ if args.imsys_clus:
     # write out everything
     common.write_LSS_scratchcp(
         data_sgc,
-        fname_sgc,
+        fname_sgc_out,
         logger=logger,
     )
     common.write_LSS_scratchcp(
         data_ngc,
-        fname_ngc,
+        fname_ngc_out,
         logger=logger,
     )
 
