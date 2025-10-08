@@ -453,7 +453,7 @@ class LinearRegressor:
         else:
             self.logger.info("Minimization succeeded, chisquare = %f", self.chi2(res.x))
             self.coefficients = res.x
-            return dict(zip([self.constant] + self.template_names, res.x, strict=True))
+            return dict(zip([self.constant, *self.template_names], res.x, strict=True))
 
     def regress_minuit(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
         """
@@ -494,7 +494,7 @@ class LinearRegressor:
             )
             self.coefficients = jnp.array(m.values)
             return dict(
-                zip([self.constant] + self.template_names, list(m.values), strict=True)
+                zip([self.constant, *self.template_names], list(m.values), strict=True)
             )
 
     def export_weights(self) -> ArrayLike:
