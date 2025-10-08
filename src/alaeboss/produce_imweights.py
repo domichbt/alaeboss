@@ -249,7 +249,7 @@ def produce_imweights(
 
     Parameters
     ----------
-    data_catalog_path : list[str]
+    data_catalog_paths : list[str]
         Path to the input data catalogs FITS files.
     random_catalogs_paths : list[str]
         List of paths to random catalogs FITS files.
