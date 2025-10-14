@@ -497,7 +497,7 @@ class LinearRegressor:
                 zip([self.constant, *self.template_names], list(m.values), strict=True)
             )
 
-    def export_weights(self) -> ArrayLike:
+    def export_weights(self) -> jnp.ndarray:
         """
         Return the imaging systematics weights using the parameters computed from the regression.
 
@@ -518,13 +518,13 @@ class LinearRegressor:
             )
         )
 
-    def mask(self) -> ArrayLike:
+    def mask(self) -> jnp.ndarray:
         """
         Return a boolean mask linking the original data catalog to the internal one (good and non-extremal values only).
 
         Returns
         -------
-        ArrayLike
+        jnp.ndarray
             Boolean mask with 0 for bad data or extremal systematics values and 1 for the rest.
         """
         if hasattr(self, "extremal_data_mask"):
