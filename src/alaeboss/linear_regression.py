@@ -377,7 +377,9 @@ class LinearRegressor:
         )
         self.logger.debug("Computed initial, correction-less chi2")
 
-    def weight_model(self, coefficients: ArrayLike):
+    def weight_model(
+        self, coefficients: ArrayLike, template_data: dict[str, ArrayLike] | None = None
+    ) -> jnp.ndarray:
         """
         Return the weights computed from the model for the data. The returned array has the same shape as the good values of the data.
 
@@ -385,11 +387,33 @@ class LinearRegressor:
         ----------
         coefficients : ArrayLike
             Parameters of the regression to weight each template, as well as the constant offset at index 0.
+        template_data : dict[str, ArrayLike] | None, optional
+            By default, the weight model is computed on the data that was used in the regression (good values). You can optionally pass alternative data in this dictionary under the form {template_name:values}. All template names must be present.
+
+        Returns
+        -------
+        jnp.ndarray
+            Array of the same shape as the good data (or the template_data) containing weights.
         """
+        if template_data is None:
+            template_values_data_normalized = (
+                self.template_values_data_normalized
+            )  # just a ref
+        else:
+            template_values_data = jnp.vstack(
+                [
+                    jnp.array(template_data[template_name])
+                    for template_name in self.template_names
+                ]
+            )
+            template_values_data_normalized = (
+                (template_values_data.T - self.edges[:, 0])
+                / (self.edges[:, -1] - self.edges[:, 0])
+            ).T
         return 1 / (
             1
             + coefficients[0]
-            + jnp.dot(coefficients[1:], self.template_values_data_normalized)
+            + jnp.dot(coefficients[1:], template_values_data_normalized)
         )
 
     def chi2(self, coefficients: ArrayLike) -> float:
@@ -413,7 +437,7 @@ class LinearRegressor:
             partial(
                 _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
-                weights=self.data * self.weight_model(coefficients),
+                weights=self.data * self.weight_model(coefficients=coefficients),
             )
         )(self.data_digitized)
         # error_everywhere = self.normalization * \
@@ -604,7 +628,7 @@ class LinearRegressor:
             partial(
                 _my_bincount,
                 accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
-                weights=self.data * self.weight_model(coefficients),
+                weights=self.data * self.weight_model(coefficients=coefficients),
             )
         )(self.data_digitized)
         chi2_arr = (
