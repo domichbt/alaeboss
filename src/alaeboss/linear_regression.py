@@ -617,6 +617,8 @@ class LinearRegressor:
             layout="constrained",
             figsize=(3 * len(self.template_names), 3),
         )
+        if not isinstance(axes, np.ndarray):
+            axes = [axes]
         axes[0].set_ylim(ylim)
 
         if coefficients is None:
