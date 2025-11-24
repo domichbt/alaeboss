@@ -225,8 +225,8 @@ def produce_imweights(
     is_clustering_catalog: bool,
     tracer_type: str,
     redshift_range: list[(float, float)],
-    templates_maps_path_S: str,  # noqa: N803
-    templates_maps_path_N: str,  # noqa: N803
+    templates_maps_path_S: str | Path | np.ndarray | Table,  # noqa: N803
+    templates_maps_path_N: str | Path | np.ndarray | Table,  # noqa: N803
     fit_maps: list[str] | dict[str, dict[str, list[str]]],
     output_directory: str | None,
     output_catalog_path: str | None,
@@ -257,10 +257,10 @@ def produce_imweights(
         Type of tracer (e.g., 'LRG', 'ELG_LOP', 'QSO').
     redshift_range : list of tuple of float
         List of (z_min, z_max) tuples defining redshift bins for regression.
-    templates_maps_path_S : str
-        Path to the South region imaging systematics templates file.
-    templates_maps_path_N : str
-        Path to the North region imaging systematics templates file.
+    templates_maps_path_S : str | Path | np.ndarray | Table
+        (Path to) the South region imaging systematics templates file.
+    templates_maps_path_N : str | Path | np.ndarray | Table
+        (Path to) the North region imaging systematics templates file.
     templates_maps_nside : int
         Nside for the template maps that are being loaded from this path. Default is 256.
     templates_maps_nested : bool
@@ -390,7 +390,7 @@ def produce_imweights(
     # and check that necessary columns are present
     logger.info("There are %i rows of data", data_catalogs.size)
     all_data = Table(data_catalogs[data_colnames], copy=True)
-    logger.info("There are %i rows of data", randoms_catalogs.size)
+    logger.info("There are %i rows of randoms", randoms_catalogs.size)
     rands = randoms_catalogs[random_colnames].copy()
 
     # select good data that has been observed
@@ -416,9 +416,15 @@ def produce_imweights(
         logger.info("Loading healpix templates for region %s", northsouth)
         match northsouth:
             case "S":
-                sys_tab = Table.read(templates_maps_path_S)
+                if isinstance(templates_maps_path_S, (np.ndarray, Table)):
+                    sys_tab = templates_maps_path_S.copy()
+                else:
+                    sys_tab = Table.read(templates_maps_path_S)
             case "N":
-                sys_tab = Table.read(templates_maps_path_N)
+                if isinstance(templates_maps_path_N, (np.ndarray, Table)):
+                    sys_tab = templates_maps_path_N.copy()
+                else:
+                    sys_tab = Table.read(templates_maps_path_N)
             case _:
                 raise KeyError(
                     "Value %s is not valid as a template region (North or South, ie 'S' or 'N')",
