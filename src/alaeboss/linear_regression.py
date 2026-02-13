@@ -371,9 +371,18 @@ class LinearRegressor:
         )
         self.logger.debug("Computed error on histogram ratio")
         self.initial_chi2 = jnp.sum(
-            (self.normalization * self.data_binned_noweights / self.randoms_binned - 1)
-            ** 2
-            / self.error**2
+            jnp.where(
+                self.randoms_binned != 0.0,
+                (
+                    self.normalization
+                    * self.data_binned_noweights
+                    / self.randoms_binned
+                    - 1
+                )
+                ** 2
+                / self.error**2,
+                0.0,
+            ),
         )
         self.logger.debug("Computed initial, correction-less chi2")
 
