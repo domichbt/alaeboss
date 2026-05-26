@@ -20,6 +20,76 @@ from jax.typing import ArrayLike
 def _my_bincount(idx, accumutalor, weights):
     return accumutalor.at[idx].add(weights)[1:-1]
 
+@jax.jit
+def weight_model(
+    template_values_data_normalized: jnp.array, coefficients: jnp.array
+) -> jnp.ndarray:
+    """
+    Return the weights computed from the model for the data. The returned array has the same shape as the good values of the data.
+
+    Parameters
+    ----------
+    template_values_data_normalized: jnp.array
+        Normalized values for the data object template values.
+    coefficients : ArrayLike
+        Parameters of the regression to weight each template, as well as the constant offset at index 0.
+
+    Returns
+    -------
+    jnp.ndarray
+        Array of the same shape as the data containing weights.
+
+    Notes
+    -----
+    This function should be called without the extremes when computing a chisquare but with them for the final weight computation.
+    """
+    return 1 / (
+        1 + coefficients[0] + jnp.dot(coefficients[1:], template_values_data_normalized)
+    )
+
+
+@jax.jit(static_argnames=["nbins"])
+def chi2(
+    coefficients: jnp.array,
+    data: jnp.array,
+    data_normalized: jnp.array,
+    data_digitized: jnp.array,
+    randoms_binned: jnp.array,
+    normalization: jnp.array,
+    error: jnp.array,
+    nbins: int,
+) -> jnp.array:
+    """
+    Return the total cost function, defined for each template as the square of the ratio (weighted data histogram) to (weighted random histogram) minus one.
+
+    Coefficients are used for the weight computation for the data.
+    Use Poisson error of the ratio of weighted data (using coefficients) and weighted randoms.
+
+    Parameters
+    ----------
+    coefficients : ArrayLike
+        Parameters of the regression to weight each template, as well as the constant offset at index 0.
+
+    Returns
+    -------
+    float
+        chisquare value for the given coefficients.
+    """
+    data_binned = jax.vmap(
+        partial(
+            _my_bincount,
+            accumutalor=jnp.zeros(nbins + 2, dtype=float),
+            weights=data
+            * weight_model(
+                template_values_data_normalized=data_normalized,
+                coefficients=coefficients,
+            ),
+        )
+    )(data_digitized)
+    return jnp.sum((normalization * data_binned / randoms_binned - 1) ** 2 / error**2)
+
+
+gradchi2 = jax.jit(jax.grad(chi2), static_argnames=["nbins"])
 
 class LinearRegressor:
     """Object that contains the data and randoms information, and can perform à la eBOSS linear regression as well as export weights."""
@@ -325,10 +395,10 @@ class LinearRegressor:
         # random bin counts are fixed here, as they do not depend on regression coefficients
         # Equivalent to digitize but faster  # shape (N_sys, len(randoms))
         self.randoms_digitized = (
-            jnp.floor(template_values_randoms_normalized * nbins).astype(minimal_dtype)
+            jnp.floor(template_values_randoms_normalized * nbins).astype(int)
             + 1
             - (self.template_values_randoms.T == self.edges[:, -1]).T
-        )
+        ).astype(minimal_dtype)
         self.logger.debug("Digitized randoms")
 
         # no axis-dependent implementation of bincount or histogram so have to initialize and fill array
@@ -345,12 +415,10 @@ class LinearRegressor:
 
         # also digitize the data for later use (can simply bincount with updated model weights)
         self.data_digitized = (
-            jnp.floor(self.template_values_data_normalized * nbins).astype(
-                minimal_dtype
-            )
+            jnp.floor(self.template_values_data_normalized * nbins).astype(int)
             + 1
             - (self.template_values_data.T == self.edges[:, -1]).T
-        )  # Equivalent to digitize but faster
+        ).astype(minimal_dtype)  # Equivalent to digitize but faster
         self.logger.debug("Digitized data")
         self.data_binned_noweights = jax.vmap(
             partial(
@@ -419,10 +487,9 @@ class LinearRegressor:
                 (template_values_data.T - self.edges[:, 0])
                 / (self.edges[:, -1] - self.edges[:, 0])
             ).T
-        return 1 / (
-            1
-            + coefficients[0]
-            + jnp.dot(coefficients[1:], template_values_data_normalized)
+        return weight_model(
+            template_values_data_normalized=template_values_data_normalized,
+            coefficients=coefficients,
         )
 
     def chi2(self, coefficients: ArrayLike) -> float:
@@ -442,19 +509,40 @@ class LinearRegressor:
         float
             chisquare value for the given coefficients.
         """
-        data_binned = jax.vmap(
-            partial(
-                _my_bincount,
-                accumutalor=jnp.zeros(self.nbins + 2, dtype=float),
-                weights=self.data * self.weight_model(coefficients=coefficients),
-            )
-        )(self.data_digitized)
-        # error_everywhere = self.normalization * \
-        #     jnp.sqrt(data_binned / self.randoms_binned**2 + data_binned**2 / self.randoms_binned**3) # model dependent error
-        # Compute the chisquare over actual imaging templates (not the constant, which is mostly useful for the weight model)
-        return jnp.sum(
-            (self.normalization * data_binned / self.randoms_binned - 1) ** 2
-            / self.error**2
+        return chi2(
+            coefficients=coefficients,
+            data=self.data,
+            data_normalized=self.template_values_data_normalized,
+            data_digitized=self.data_digitized,
+            randoms_binned=self.randoms_binned,
+            normalization=self.normalization,
+            error=self.error,
+            nbins=self.nbins,
+        )
+
+    def gradchi2(self, coefficients: ArrayLike) -> ArrayLike:
+        """
+        Return the gradient of total cost function, with respect to the input coefficients of the model.
+
+        Parameters
+        ----------
+        coefficients : ArrayLike
+            Parameters of the regression to weight each template, as well as the constant offset at index 0.
+
+        Returns
+        -------
+        ArrayLike
+            Gradient of chisquare value for the given coefficients.
+        """
+        return gradchi2(
+            coefficients,
+            data=self.data,
+            data_normalized=self.template_values_data_normalized,
+            data_digitized=self.data_digitized,
+            randoms_binned=self.randoms_binned,
+            normalization=self.normalization,
+            error=self.error,
+            nbins=self.nbins,
         )
 
     def regress(self, guess: ArrayLike | None = None) -> dict[str, float] | None:
@@ -472,14 +560,27 @@ class LinearRegressor:
             Dictionnary of the fit coefficient for each template. The offset is referred to as 'constant'. If the minimization fails, ``None`` is returned.
         """
         if guess is None:
-            guess = jnp.ones(shape=(len(self.template_names) + 1), dtype=float)
+            guess = jnp.zeros(shape=(len(self.template_names) + 1), dtype=float)
 
         self.logger.info("Starting minimization with initial guess %s", str(guess))
         self.logger.info(
             "Without photometry model, the chisquare is %f", self.initial_chi2
         )
 
-        res = jaxminimize(self.chi2, guess, method="BFGS")
+        res = jaxminimize(
+            chi2,
+            x0=guess,
+            args=(
+                self.data,
+                self.template_values_data_normalized,
+                self.data_digitized,
+                self.randoms_binned,
+                self.normalization,
+                self.error,
+                self.nbins,
+            ),
+            method="BFGS",
+        )
         if not res.success:
             self.logger.error("The optimization failed with status %i", res.status)
             return None
@@ -512,7 +613,10 @@ class LinearRegressor:
             "Without photometry model, the chisquare is %f", self.initial_chi2
         )
 
-        m = Minuit(jax.jit(self.chi2), guess, grad=jax.jit(jax.grad(self.chi2)))
+        pchi2 = lambda coeffs: self.chi2(coefficients=coeffs)
+        pgradchi2 = lambda coeffs: self.gradchi2(coefficients=coeffs)
+
+        m = Minuit(pchi2, guess, grad=pgradchi2)
         m.errordef = Minuit.LEAST_SQUARES
         m.limits = [(None, None)] * len(guess)
         m.errors = [0.1] * len(guess)
